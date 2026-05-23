@@ -1,0 +1,309 @@
+//@version=5
+indicator("Multi-Timeframe Fractal Market Structure", overlay=true, max_lines_count=500, max_labels_count=500)
+
+// ============================================================================
+// INPUTS
+// ============================================================================
+showDaily = input.bool(true, "Show Daily Fractal Structure", group="Daily Timeframe")
+dailyBullColor = input.color(color.new(color.blue, 0), "Daily Bull Color", group="Daily Timeframe")
+dailyBearColor = input.color(color.new(color.red, 0), "Daily Bear Color", group="Daily Timeframe")
+dailyLineWidth = input.int(2, "Daily Line Width", minval=1, maxval=5, group="Daily Timeframe")
+
+show4hFractal = input.bool(true, "Show 4H Fractal Structure", group="4 Hour Timeframe")
+h4FractalBullColor = input.color(color.new(color.aqua, 0), "4H Fractal Bull Color", group="4 Hour Timeframe")
+h4FractalBearColor = input.color(color.new(color.orange, 0), "4H Fractal Bear Color", group="4 Hour Timeframe")
+h4FractalLineWidth = input.int(2, "4H Fractal Line Width", minval=1, maxval=5, group="4 Hour Timeframe")
+
+show4hSwing = input.bool(true, "Show 4H Swing Structure", group="4 Hour Swing")
+h4SwingBullColor = input.color(color.new(color.lime, 30), "4H Swing Bull Color", group="4 Hour Swing")
+h4SwingBearColor = input.color(color.new(color.fuchsia, 30), "4H Swing Bear Color", group="4 Hour Swing")
+h4SwingLineWidth = input.int(1, "4H Swing Line Width", minval=1, maxval=5, group="4 Hour Swing")
+
+showLabels = input.bool(true, "Show Structure Labels", group="Display Options")
+showBreakLines = input.bool(true, "Show Break of Structure Lines", group="Display Options")
+
+// ============================================================================
+// FRACTAL DETECTION FUNCTION
+// ============================================================================
+// Detects swing highs and lows (fractals) with specified lookback
+detectFractal(src, leftBars, rightBars, isHigh) =>
+    if isHigh
+        bool isSwingHigh = true
+        for i = 1 to leftBars
+            if src[i] >= src
+                isSwingHigh := false
+                break
+        if isSwingHigh
+            for i = 0 to rightBars - 1
+                if src[-i] > src
+                    isSwingHigh := false
+                    break
+        isSwingHigh
+    else
+        bool isSwingLow = true
+        for i = 1 to leftBars
+            if src[i] <= src
+                isSwingLow := false
+                break
+        if isSwingLow
+            for i = 0 to rightBars - 1
+                if src[-i] < src
+                    isSwingLow := false
+                    break
+        isSwingLow
+
+// ============================================================================
+// MARKET STRUCTURE FUNCTION
+// ============================================================================
+type StructurePoint
+    int barIndex
+    float price
+    bool isHigh
+    string label
+
+// Function to get higher timeframe data
+getHTFData(tf) =>
+    htfHigh = request.security(syminfo.tickerid, tf, high, lookahead=barmerge.lookahead_off)
+    htfLow = request.security(syminfo.tickerid, tf, low, lookahead=barmerge.lookahead_off)
+    htfClose = request.security(syminfo.tickerid, tf, close, lookahead=barmerge.lookahead_off)
+    htfTime = request.security(syminfo.tickerid, tf, time, lookahead=barmerge.lookahead_off)
+    [htfHigh, htfLow, htfClose, htfTime]
+
+// ============================================================================
+// DAILY FRACTAL STRUCTURE
+// ============================================================================
+[dailyHigh, dailyLow, dailyClose, dailyTime] = getHTFData("D")
+dailyTimeChanged = ta.change(dailyTime) != 0
+
+var float lastDailyHigh = na
+var float lastDailyLow = na
+var int lastDailyHighBar = na
+var int lastDailyLowBar = na
+var bool dailyTrend = true  // true = bullish, false = bearish
+var line dailyStructureLine = na
+
+if dailyTimeChanged and not na(dailyHigh[1]) and not na(dailyLow[1])
+    // Detect swing high (fractal)
+    if dailyHigh[2] < dailyHigh[1] and dailyHigh[1] > dailyHigh
+        if not na(lastDailyHigh)
+            // Check for Higher High (HH) or Lower High (LH)
+            if dailyHigh[1] > lastDailyHigh
+                // Higher High - Bullish
+                if showDaily
+                    line.new(lastDailyHighBar, lastDailyHigh, bar_index, dailyHigh[1], 
+                             color=dailyBullColor, width=dailyLineWidth, style=line.style_solid)
+                    if showLabels
+                        label.new(bar_index, dailyHigh[1], "HH\nDaily", 
+                                 color=color.new(dailyBullColor, 70), textcolor=dailyBullColor, 
+                                 style=label.style_label_down, size=size.small)
+                dailyTrend := true
+            else
+                // Lower High - Bearish
+                if showDaily
+                    line.new(lastDailyHighBar, lastDailyHigh, bar_index, dailyHigh[1], 
+                             color=dailyBearColor, width=dailyLineWidth, style=line.style_solid)
+                    if showLabels
+                        label.new(bar_index, dailyHigh[1], "LH\nDaily", 
+                                 color=color.new(dailyBearColor, 70), textcolor=dailyBearColor, 
+                                 style=label.style_label_down, size=size.small)
+                dailyTrend := false
+        lastDailyHigh := dailyHigh[1]
+        lastDailyHighBar := bar_index
+    
+    // Detect swing low (fractal)
+    if dailyLow[2] > dailyLow[1] and dailyLow[1] < dailyLow
+        if not na(lastDailyLow)
+            // Check for Higher Low (HL) or Lower Low (LL)
+            if dailyLow[1] > lastDailyLow
+                // Higher Low - Bullish
+                if showDaily
+                    line.new(lastDailyLowBar, lastDailyLow, bar_index, dailyLow[1], 
+                             color=dailyBullColor, width=dailyLineWidth, style=line.style_solid)
+                    if showLabels
+                        label.new(bar_index, dailyLow[1], "HL\nDaily", 
+                                 color=color.new(dailyBullColor, 70), textcolor=dailyBullColor, 
+                                 style=label.style_label_up, size=size.small)
+                dailyTrend := true
+            else
+                // Lower Low - Bearish
+                if showDaily
+                    line.new(lastDailyLowBar, lastDailyLow, bar_index, dailyLow[1], 
+                             color=dailyBearColor, width=dailyLineWidth, style=line.style_solid)
+                    if showLabels
+                        label.new(bar_index, dailyLow[1], "LL\nDaily", 
+                                 color=color.new(dailyBearColor, 70), textcolor=dailyBearColor, 
+                                 style=label.style_label_up, size=size.small)
+                dailyTrend := false
+        lastDailyLow := dailyLow[1]
+        lastDailyLowBar := bar_index
+
+// ============================================================================
+// 4 HOUR FRACTAL STRUCTURE
+// ============================================================================
+[h4High, h4Low, h4Close, h4Time] = getHTFData("240")
+h4TimeChanged = ta.change(h4Time) != 0
+
+var float lastH4High = na
+var float lastH4Low = na
+var int lastH4HighBar = na
+var int lastH4LowBar = na
+var bool h4FractalTrend = true
+
+if h4TimeChanged and not na(h4High[1]) and not na(h4Low[1])
+    // Detect 4H swing high
+    if h4High[2] < h4High[1] and h4High[1] > h4High
+        if not na(lastH4High)
+            if h4High[1] > lastH4High
+                // Higher High
+                if show4hFractal
+                    line.new(lastH4HighBar, lastH4High, bar_index, h4High[1], 
+                             color=h4FractalBullColor, width=h4FractalLineWidth)
+                    if showLabels
+                        label.new(bar_index, h4High[1], "HH\n4H", 
+                                 color=color.new(h4FractalBullColor, 70), textcolor=h4FractalBullColor, 
+                                 style=label.style_label_down, size=size.tiny)
+                h4FractalTrend := true
+            else
+                // Lower High
+                if show4hFractal
+                    line.new(lastH4HighBar, lastH4High, bar_index, h4High[1], 
+                             color=h4FractalBearColor, width=h4FractalLineWidth)
+                    if showLabels
+                        label.new(bar_index, h4High[1], "LH\n4H", 
+                                 color=color.new(h4FractalBearColor, 70), textcolor=h4FractalBearColor, 
+                                 style=label.style_label_down, size=size.tiny)
+                h4FractalTrend := false
+        lastH4High := h4High[1]
+        lastH4HighBar := bar_index
+    
+    // Detect 4H swing low
+    if h4Low[2] > h4Low[1] and h4Low[1] < h4Low
+        if not na(lastH4Low)
+            if h4Low[1] > lastH4Low
+                // Higher Low
+                if show4hFractal
+                    line.new(lastH4LowBar, lastH4Low, bar_index, h4Low[1], 
+                             color=h4FractalBullColor, width=h4FractalLineWidth)
+                    if showLabels
+                        label.new(bar_index, h4Low[1], "HL\n4H", 
+                                 color=color.new(h4FractalBullColor, 70), textcolor=h4FractalBullColor, 
+                                 style=label.style_label_up, size=size.tiny)
+                h4FractalTrend := true
+            else
+                // Lower Low
+                if show4hFractal
+                    line.new(lastH4LowBar, lastH4Low, bar_index, h4Low[1], 
+                             color=h4FractalBearColor, width=h4FractalLineWidth)
+                    if showLabels
+                        label.new(bar_index, h4Low[1], "LL\n4H", 
+                                 color=color.new(h4FractalBearColor, 70), textcolor=h4FractalBearColor, 
+                                 style=label.style_label_up, size=size.tiny)
+                h4FractalTrend := false
+        lastH4Low := h4Low[1]
+        lastH4LowBar := bar_index
+
+// ============================================================================
+// 4 HOUR SWING STRUCTURE (More Sensitive)
+// ============================================================================
+// Get 4H data for swing detection with shorter lookback
+[h4SwingHigh, h4SwingLow, h4SwingClose, h4SwingTime] = getHTFData("240")
+h4SwingTimeChanged = ta.change(h4SwingTime) != 0
+
+var float lastH4SwingHigh = na
+var float lastH4SwingLow = na
+var int lastH4SwingHighBar = na
+var int lastH4SwingLowBar = na
+var bool h4SwingTrend = true
+
+// More sensitive swing detection (every candle, not just at timeframe change)
+isH4SwingHigh = high[1] > high[2] and high[1] > high and high[1] > high[3]
+isH4SwingLow = low[1] < low[2] and low[1] < low and low[1] < low[3]
+
+if isH4SwingHigh
+    if not na(lastH4SwingHigh)
+        if high[1] > lastH4SwingHigh
+            // Higher High
+            if show4hSwing
+                line.new(lastH4SwingHighBar, lastH4SwingHigh, bar_index[1], high[1], 
+                         color=h4SwingBullColor, width=h4SwingLineWidth, style=line.style_dashed)
+                if showLabels
+                    label.new(bar_index[1], high[1], "HH", 
+                             color=color.new(h4SwingBullColor, 80), textcolor=h4SwingBullColor, 
+                             style=label.style_label_down, size=size.tiny)
+            h4SwingTrend := true
+        else
+            // Lower High
+            if show4hSwing
+                line.new(lastH4SwingHighBar, lastH4SwingHigh, bar_index[1], high[1], 
+                         color=h4SwingBearColor, width=h4SwingLineWidth, style=line.style_dashed)
+                if showLabels
+                    label.new(bar_index[1], high[1], "LH", 
+                             color=color.new(h4SwingBearColor, 80), textcolor=h4SwingBearColor, 
+                             style=label.style_label_down, size=size.tiny)
+            h4SwingTrend := false
+    lastH4SwingHigh := high[1]
+    lastH4SwingHighBar := bar_index[1]
+
+if isH4SwingLow
+    if not na(lastH4SwingLow)
+        if low[1] > lastH4SwingLow
+            // Higher Low
+            if show4hSwing
+                line.new(lastH4SwingLowBar, lastH4SwingLow, bar_index[1], low[1], 
+                         color=h4SwingBullColor, width=h4SwingLineWidth, style=line.style_dashed)
+                if showLabels
+                    label.new(bar_index[1], low[1], "HL", 
+                             color=color.new(h4SwingBullColor, 80), textcolor=h4SwingBullColor, 
+                             style=label.style_label_up, size=size.tiny)
+            h4SwingTrend := true
+        else
+            // Lower Low
+            if show4hSwing
+                line.new(lastH4SwingLowBar, lastH4SwingLow, bar_index[1], low[1], 
+                         color=h4SwingBearColor, width=h4SwingLineWidth, style=line.style_dashed)
+                if showLabels
+                    label.new(bar_index[1], low[1], "LL", 
+                             color=color.new(h4SwingBearColor, 80), textcolor=h4SwingBearColor, 
+                             style=label.style_label_up, size=size.tiny)
+            h4SwingTrend := false
+    lastH4SwingLow := low[1]
+    lastH4SwingLowBar := bar_index[1]
+
+// ============================================================================
+// TREND BACKGROUND (Optional)
+// ============================================================================
+showBackground = input.bool(false, "Show Trend Background", group="Display Options")
+bgAlpha = input.int(95, "Background Transparency", minval=80, maxval=98, group="Display Options")
+
+if showBackground
+    dailyBgColor = dailyTrend ? color.new(color.green, bgAlpha) : color.new(color.red, bgAlpha)
+    bgcolor(dailyBgColor, title="Daily Trend Background")
+
+// ============================================================================
+// PLOT CURRENT TREND INFO
+// ============================================================================
+var table infoTable = table.new(position.top_right, 2, 4, border_width=1)
+if barstate.islast and showLabels
+    table.cell(infoTable, 0, 0, "Timeframe", bgcolor=color.new(color.gray, 70), text_color=color.white)
+    table.cell(infoTable, 1, 0, "Trend", bgcolor=color.new(color.gray, 70), text_color=color.white)
+    
+    table.cell(infoTable, 0, 1, "Daily", text_color=color.white)
+    table.cell(infoTable, 1, 1, dailyTrend ? "Bullish" : "Bearish", 
+               bgcolor=dailyTrend ? color.new(color.green, 70) : color.new(color.red, 70), 
+               text_color=color.white)
+    
+    table.cell(infoTable, 0, 2, "4H Fractal", text_color=color.white)
+    table.cell(infoTable, 1, 2, h4FractalTrend ? "Bullish" : "Bearish", 
+               bgcolor=h4FractalTrend ? color.new(color.green, 70) : color.new(color.red, 70), 
+               text_color=color.white)
+    
+    table.cell(infoTable, 0, 3, "4H Swing", text_color=color.white)
+    table.cell(infoTable, 1, 3, h4SwingTrend ? "Bullish" : "Bearish", 
+               bgcolor=h4SwingTrend ? color.new(color.green, 70) : color.new(color.red, 70), 
+               text_color=color.white)
+
+// Alert conditions
+alertcondition(dailyTrend and not dailyTrend[1], "Daily Bullish Structure", "Daily trend turned bullish")
+alertcondition(not dailyTrend and dailyTrend[1], "Daily Bearish Structure", "Daily trend turned bearish")
+alertcondition(h4FractalTrend and not h4FractalTrend[1], "4H Fractal Bullish", "4H fractal turned bullish")
+alertcondition(not h4FractalTrend and h4FractalTrend[1], "4H Fractal Bearish", "4H fractal turned bearish")

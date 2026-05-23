@@ -275,9 +275,9 @@ if isH4SwingLow
 showBackground = input.bool(false, "Show Trend Background", group="Display Options")
 bgAlpha = input.int(95, "Background Transparency", minval=80, maxval=98, group="Display Options")
 
-if showBackground
-    dailyBgColor = dailyTrend ? color.new(color.green, bgAlpha) : color.new(color.red, bgAlpha)
-    bgcolor(dailyBgColor, title="Daily Trend Background")
+// Move bgcolor outside of if statement (required by Pine Script)
+dailyBgColor = showBackground and dailyTrend ? color.new(color.green, bgAlpha) : showBackground and not dailyTrend ? color.new(color.red, bgAlpha) : na
+bgcolor(dailyBgColor, title="Daily Trend Background")
 
 // ============================================================================
 // PLOT CURRENT TREND INFO

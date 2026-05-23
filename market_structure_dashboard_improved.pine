@@ -200,44 +200,74 @@ if not na(lastIntSH) and not na(lastIntSL)
 
 // ═══════════════════════════════════════════════════════════
 // MULTI-TIMEFRAME DATA FOR DASHBOARD
+// All timeframes now use the SAME structure logic as chart
 // ═══════════════════════════════════════════════════════════
 
-// --- SWING STRUCTURE: Using custom timeframes ---
-sw1High = request.security(syminfo.tickerid, swingTF1, ta.highest(high, 3)[1], lookahead=barmerge.lookahead_on)
-sw1Bull = close > sw1High
-sw1Dir  = sw1Bull ? "Bullish" : "Bearish"
-sw1Ctx  = sw1Bull ? "Close > Prev High" : "Close < Prev Low"
-sw1Col  = sw1Bull ? bullCol : bearCol
+// Helper function to get structure trend for any timeframe
+getStructureTrend(tf) =>
+    [htfExtTrend, htfLastSH, htfLastSL] = request.security(syminfo.tickerid, tf, 
+         [extTrend, lastExtSH, lastExtSL], lookahead=barmerge.lookahead_off)
+    htfExtTrend
 
-sw2High = request.security(syminfo.tickerid, swingTF2, high[1], lookahead=barmerge.lookahead_on)
-sw2Bull = close > sw2High
-sw2Dir  = sw2Bull ? "Bullish" : "Bearish"
-sw2Ctx  = sw2Bull ? "Close > Prev High" : "Close < Prev Low"
-sw2Col  = sw2Bull ? bullCol : bearCol
+getStructureContext(tf) =>
+    [htfExtTrend, htfLastSH, htfLastSL, htfClose] = request.security(syminfo.tickerid, tf, 
+         [extTrend, lastExtSH, lastExtSL, close], lookahead=barmerge.lookahead_off)
+    
+    ctx = ""
+    if htfExtTrend == 1
+        ctx := "Breaking Higher Highs"
+    else if htfExtTrend == -1
+        ctx := "Breaking Lower Lows"
+    else
+        ctx := "Awaiting Structure"
+    ctx
 
-sw3High = request.security(syminfo.tickerid, swingTF3, ta.highest(high, 20)[1], lookahead=barmerge.lookahead_on)
-sw3Cls  = request.security(syminfo.tickerid, swingTF3, close, lookahead=barmerge.lookahead_on)
-sw3Bull = sw3Cls > sw3High
-sw3Dir  = sw3Bull ? "Bullish" : "Bearish"
-sw3Ctx  = sw3Bull ? "Close > Prev High" : "Close < Prev Low"
-sw3Col  = sw3Bull ? bullCol : bearCol
+// --- SWING STRUCTURE: Using same external structure logic ---
+sw1Trend = getStructureTrend(swingTF1)
+sw1Dir   = sw1Trend == 1 ? "Bullish" : sw1Trend == -1 ? "Bearish" : "Neutral"
+sw1Ctx   = getStructureContext(swingTF1)
+sw1Col   = sw1Trend == 1 ? bullCol : sw1Trend == -1 ? bearCol : color.new(#888888, 0)
 
-// --- INTERNAL STRUCTURE: Using custom timeframes ---
-int1High = request.security(syminfo.tickerid, intTF1, ta.highest(high, 20)[1], lookahead=barmerge.lookahead_on)
-int1Cls  = request.security(syminfo.tickerid, intTF1, close, lookahead=barmerge.lookahead_on)
-int1Bull = int1Cls > int1High
-int1Dir  = int1Bull ? "Bullish" : "Bearish"
-int1Stg  = int1Bull ? "Expansion" : "Confirmed Shift"
-int1Col  = int1Bull ? bullCol : bearCol
+sw2Trend = getStructureTrend(swingTF2)
+sw2Dir   = sw2Trend == 1 ? "Bullish" : sw2Trend == -1 ? "Bearish" : "Neutral"
+sw2Ctx   = getStructureContext(swingTF2)
+sw2Col   = sw2Trend == 1 ? bullCol : sw2Trend == -1 ? bearCol : color.new(#888888, 0)
 
-int2High = request.security(syminfo.tickerid, intTF2, ta.highest(high, 20)[1], lookahead=barmerge.lookahead_on)
-int2Cls  = request.security(syminfo.tickerid, intTF2, close, lookahead=barmerge.lookahead_on)
-int2Bull = int2Cls > int2High
-int2Dir  = int2Bull ? "Bullish" : "Bearish"
-int2Stg  = int2Bull ? "Expansion" : "Retracement"
-int2Col  = int2Bull ? bullCol : bearCol
+sw3Trend = getStructureTrend(swingTF3)
+sw3Dir   = sw3Trend == 1 ? "Bullish" : sw3Trend == -1 ? "Bearish" : "Neutral"
+sw3Ctx   = getStructureContext(swingTF3)
+sw3Col   = sw3Trend == 1 ? bullCol : sw3Trend == -1 ? bearCol : color.new(#888888, 0)
 
-// Chart TF live
+// --- INTERNAL STRUCTURE: Using same internal structure logic ---
+getInternalTrend(tf) =>
+    [htfIntTrend, htfLastIntSH, htfLastIntSL] = request.security(syminfo.tickerid, tf, 
+         [intTrend, lastIntSH, lastIntSL], lookahead=barmerge.lookahead_off)
+    htfIntTrend
+
+getInternalStage(tf) =>
+    [htfIntTrend, htfExtTrend] = request.security(syminfo.tickerid, tf, 
+         [intTrend, extTrend], lookahead=barmerge.lookahead_off)
+    
+    stage = ""
+    if htfIntTrend == htfExtTrend and htfIntTrend != 0
+        stage := "Aligned - Expansion"
+    else if htfIntTrend != htfExtTrend and htfIntTrend != 0 and htfExtTrend != 0
+        stage := "Divergence - Retracement"
+    else
+        stage := "Forming Structure"
+    stage
+
+int1Trend = getInternalTrend(intTF1)
+int1Dir   = int1Trend == 1 ? "Bullish" : int1Trend == -1 ? "Bearish" : "Neutral"
+int1Stg   = getInternalStage(intTF1)
+int1Col   = int1Trend == 1 ? bullCol : int1Trend == -1 ? bearCol : color.new(#888888, 0)
+
+int2Trend = getInternalTrend(intTF2)
+int2Dir   = int2Trend == 1 ? "Bullish" : int2Trend == -1 ? "Bearish" : "Neutral"
+int2Stg   = getInternalStage(intTF2)
+int2Col   = int2Trend == 1 ? bullCol : int2Trend == -1 ? bearCol : color.new(#888888, 0)
+
+// Chart TF live - uses the tracked external/internal trends
 chartExtDir = extTrend ==  1 ? "Bullish" : extTrend == -1 ? "Bearish" : "Neutral"
 chartExtCol = extTrend ==  1 ? bullCol   : extTrend == -1 ? bearCol   : color.new(#888888, 0)
 chartIntDir = intTrend ==  1 ? "Bullish" : intTrend == -1 ? "Bearish" : "Neutral"

@@ -38,6 +38,7 @@ intTF2 = input.timeframe("60",  "Internal TF 2", group=grp5, tooltip="Second int
 // ═══════════════════════════════════════════════════════════
 // EXTERNAL STRUCTURE (Major swing highs/lows)
 // Only triggers BOS/CHoCH when CLOSE breaks the level
+// Creates ZIGZAG pattern - alternating highs and lows only
 // ═══════════════════════════════════════════════════════════
 extSH = ta.pivothigh(high, extLen, extLen)
 extSL = ta.pivotlow(low,   extLen, extLen)
@@ -51,32 +52,42 @@ var float prevExtSL     = na
 var int   extTrend      = 0  // 1=bullish, -1=bearish, 0=neutral
 var bool  extBosTriggered = false
 var bool  extChochTriggered = false
+var string lastSwingType = "none"  // Track if last swing was "high" or "low" for zigzag pattern
 
-// Detect new external pivots - only update if it's a SIGNIFICANT swing
+// Detect new external pivots - ZIGZAG LOGIC
+// Only accept a high after a low, and a low after a high
 bool isSignificantHigh = false
 bool isSignificantLow = false
 
 if not na(extSH)
-    // Only update if this is a NEW high in an uptrend, or significantly higher than previous
-    if na(lastExtSH) or extSH > lastExtSH or (not na(lastExtSL) and lastExtSL_bar > lastExtSH_bar)
+    // Only accept this high if:
+    // 1. We haven't recorded any swing yet (first one)
+    // 2. Last swing was a LOW (creating zigzag)
+    // 3. This high is higher than previous high (making progress)
+    if lastSwingType == "none" or (lastSwingType == "low" and (na(lastExtSH) or extSH > lastExtSH))
         prevExtSH     := lastExtSH
         lastExtSH     := extSH
         lastExtSH_bar := bar_index - extLen
         extBosTriggered := false
         extChochTriggered := false
+        lastSwingType := "high"
         isSignificantHigh := true
 
 if not na(extSL)
-    // Only update if this is a NEW low in a downtrend, or significantly lower than previous
-    if na(lastExtSL) or extSL < lastExtSL or (not na(lastExtSH) and lastExtSH_bar > lastExtSL_bar)
+    // Only accept this low if:
+    // 1. We haven't recorded any swing yet (first one)
+    // 2. Last swing was a HIGH (creating zigzag)
+    // 3. This low is lower than previous low (making progress)
+    if lastSwingType == "none" or (lastSwingType == "high" and (na(lastExtSL) or extSL < lastExtSL))
         prevExtSL     := lastExtSL
         lastExtSL     := extSL
         lastExtSL_bar := bar_index - extLen
         extBosTriggered := false
         extChochTriggered := false
+        lastSwingType := "low"
         isSignificantLow := true
 
-// Draw external structure lines - ONLY for significant swings
+// Draw external structure lines - ONLY for zigzag swings
 if showExtLines and isSignificantHigh
     line.new(bar_index - extLen, lastExtSH, bar_index + 30, lastExtSH,
              color=color.new(extCol, 30), style=line.style_solid, width=2)

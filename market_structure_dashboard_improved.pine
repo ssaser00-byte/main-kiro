@@ -5,8 +5,8 @@ indicator("Market Structure Dashboard [Swing Trader] - Improved", overlay=true, 
 // INPUTS
 // ═══════════════════════════════════════════════════════════
 grp1 = "Structure Settings"
-extLen       = input.int(20, "External Swing Length", minval=5, maxval=100, group=grp1, tooltip="Larger pivots — major swing highs/lows")
-intLen       = input.int(7,  "Internal Swing Length", minval=2, maxval=30,  group=grp1, tooltip="Smaller pivots — minor highs/lows within each swing leg")
+extLen       = input.int(50, "External Swing Length", minval=10, maxval=200, group=grp1, tooltip="Larger pivots — major swing highs/lows (optimized for 4H)")
+intLen       = input.int(15,  "Internal Swing Length", minval=5, maxval=50,  group=grp1, tooltip="Smaller pivots — minor highs/lows within each swing leg")
 
 grp2 = "Display"
 showExtLines = input.bool(true, "Show External Lines", group=grp2)
@@ -52,28 +52,37 @@ var int   extTrend      = 0  // 1=bullish, -1=bearish, 0=neutral
 var bool  extBosTriggered = false
 var bool  extChochTriggered = false
 
-// Detect new external pivots
+// Detect new external pivots - only update if it's a SIGNIFICANT swing
+bool isSignificantHigh = false
+bool isSignificantLow = false
+
 if not na(extSH)
-    prevExtSH     := lastExtSH
-    lastExtSH     := extSH
-    lastExtSH_bar := bar_index - extLen
-    extBosTriggered := false
-    extChochTriggered := false
+    // Only update if this is a NEW high in an uptrend, or significantly higher than previous
+    if na(lastExtSH) or extSH > lastExtSH or (not na(lastExtSL) and lastExtSL_bar > lastExtSH_bar)
+        prevExtSH     := lastExtSH
+        lastExtSH     := extSH
+        lastExtSH_bar := bar_index - extLen
+        extBosTriggered := false
+        extChochTriggered := false
+        isSignificantHigh := true
 
 if not na(extSL)
-    prevExtSL     := lastExtSL
-    lastExtSL     := extSL
-    lastExtSL_bar := bar_index - extLen
-    extBosTriggered := false
-    extChochTriggered := false
+    // Only update if this is a NEW low in a downtrend, or significantly lower than previous
+    if na(lastExtSL) or extSL < lastExtSL or (not na(lastExtSH) and lastExtSH_bar > lastExtSL_bar)
+        prevExtSL     := lastExtSL
+        lastExtSL     := extSL
+        lastExtSL_bar := bar_index - extLen
+        extBosTriggered := false
+        extChochTriggered := false
+        isSignificantLow := true
 
-// Draw external structure lines
-if showExtLines and not na(extSH)
-    line.new(bar_index - extLen, extSH, bar_index + 20, extSH,
+// Draw external structure lines - ONLY for significant swings
+if showExtLines and isSignificantHigh
+    line.new(bar_index - extLen, lastExtSH, bar_index + 30, lastExtSH,
              color=color.new(extCol, 30), style=line.style_solid, width=2)
 
-if showExtLines and not na(extSL)
-    line.new(bar_index - extLen, extSL, bar_index + 20, extSL,
+if showExtLines and isSignificantLow
+    line.new(bar_index - extLen, lastExtSL, bar_index + 30, lastExtSL,
              color=color.new(extCol, 30), style=line.style_solid, width=2)
 
 // Check for EXTERNAL BOS/CHoCH on CLOSE

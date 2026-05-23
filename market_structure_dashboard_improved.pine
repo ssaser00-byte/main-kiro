@@ -1,17 +1,16 @@
 //@version=5
-indicator("Market Structure Dashboard [Swing Trader] - Improved", overlay=true, max_bars_back=500, max_lines_count=300, max_labels_count=300, max_boxes_count=100)
+indicator("Market Structure Dashboard [Swing Trader] - Improved", overlay=true, max_bars_back=500, max_lines_count=500, max_labels_count=500, max_boxes_count=100)
 
 // ═══════════════════════════════════════════════════════════
 // INPUTS
 // ═══════════════════════════════════════════════════════════
 grp1 = "Structure Settings"
-extLen       = input.int(50, "External Swing Length", minval=10, maxval=200, group=grp1, tooltip="Larger pivots — major swing highs/lows (optimized for 4H)")
-intLen       = input.int(15,  "Internal Swing Length", minval=5, maxval=50,  group=grp1, tooltip="Smaller pivots — minor highs/lows within each swing leg")
+extLen       = input.int(30, "External Swing Length", minval=10, maxval=200, group=grp1, tooltip="Larger pivots — major swing highs/lows")
+intLen       = input.int(8,  "Internal Swing Length", minval=2, maxval=50,  group=grp1, tooltip="Smaller pivots — minor highs/lows within each swing leg")
 
 grp2 = "Display"
 showExtLines = input.bool(true, "Show External Lines", group=grp2)
 showIntLines = input.bool(true, "Show Internal Lines", group=grp2)
-showBoxes    = input.bool(true, "Show Impulse Boxes", group=grp2, tooltip="Draw boxes around impulse moves that break structure")
 showLabels   = input.bool(true, "Show BOS/CHoCH Labels", group=grp2)
 showDash     = input.bool(true, "Show Dashboard",      group=grp2)
 dashPos      = input.string("Top Right", "Dashboard Position", options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=grp2)
@@ -23,8 +22,6 @@ bullCol = input.color(color.new(#00e676, 0), "Bullish",            group=grp3)
 bearCol = input.color(color.new(#ff1744, 0), "Bearish",            group=grp3)
 bosCol  = input.color(color.new(#2196F3, 0), "BOS Color",          group=grp3)
 chochCol = input.color(color.new(#FF9800, 0), "CHoCH Color",       group=grp3)
-bullBoxCol = input.color(color.new(#4caf50, 85), "Bullish Impulse Box", group=grp3)
-bearBoxCol = input.color(color.new(#f44336, 85), "Bearish Impulse Box", group=grp3)
 
 // ═══════════════════════════════════════════════════════════
 // TIMEFRAME INPUTS
@@ -39,199 +36,100 @@ intTF1 = input.timeframe("240", "Internal TF 1", group=grp5, tooltip="First inte
 intTF2 = input.timeframe("60",  "Internal TF 2", group=grp5, tooltip="Second internal structure timeframe (60 = 1H)")
 
 // ═══════════════════════════════════════════════════════════
-// EXTERNAL STRUCTURE (Major swing highs/lows)
-// Only triggers BOS/CHoCH when CLOSE breaks the level
-// Creates ZIGZAG pattern - alternating highs and lows only
-// Draws BOXES around impulse moves
+// SWING DETECTION (UAlgo Style)
 // ═══════════════════════════════════════════════════════════
-extSH = ta.pivothigh(high, extLen, extLen)
-extSL = ta.pivotlow(low,   extLen, extLen)
+type swing
+    float price = na
+    int time = na
+    bool crossed = false
 
-var float lastExtSH     = na
-var float lastExtSL     = na
-var int   lastExtSH_bar = na
-var int   lastExtSL_bar = na
-var float prevExtSH     = na
-var float prevExtSL     = na
-var int   extTrend      = 0  // 1=bullish, -1=bearish, 0=neutral
-var bool  extBosTriggered = false
-var bool  extChochTriggered = false
-var string lastSwingType = "none"  // Track if last swing was "high" or "low" for zigzag pattern
-var int impulseStart = na  // Track where impulse started
+type market
+    string msbOrBos
+    int direction
+    line marketLine
+    int lastLineTime
+    label marketLabel
 
-// Detect new external pivots - ZIGZAG LOGIC
-// Only accept a high after a low, and a low after a high
-bool isSignificantHigh = false
-bool isSignificantLow = false
+var market internalStructure = market.new(na, na, na, 0)
+var market externalStructure = market.new(na, na, na, 0)
 
-if not na(extSH)
-    // Only accept this high if last swing was a LOW (creating zigzag)
-    if lastSwingType == "none" or (lastSwingType == "low" and (na(lastExtSH) or extSH > lastExtSH))
-        prevExtSH     := lastExtSH
-        lastExtSH     := extSH
-        lastExtSH_bar := bar_index - extLen
-        
-        // Draw box from last low to this high (bullish impulse)
-        if showBoxes and not na(lastExtSL) and not na(lastExtSL_bar)
-            box.new(lastExtSL_bar, lastExtSL, lastExtSH_bar, extSH,
-                   bgcolor=bullBoxCol, border_color=color.new(bullCol, 60), 
-                   border_width=1, extend=extend.right)
-        
-        extBosTriggered := false
-        extChochTriggered := false
-        lastSwingType := "high"
-        impulseStart := lastExtSL_bar
-        isSignificantHigh := true
+detectSwings(len) =>
+    var int swingDirection = 0
+    var swing highPoint = swing.new(na, na)
+    var swing lowPoint = swing.new(na, na)
+    upperLevel = ta.highest(len)
+    lowerLevel = ta.lowest(len)
 
-if not na(extSL)
-    // Only accept this low if last swing was a HIGH (creating zigzag)
-    if lastSwingType == "none" or (lastSwingType == "high" and (na(lastExtSL) or extSL < lastExtSL))
-        prevExtSL     := lastExtSL
-        lastExtSL     := extSL
-        lastExtSL_bar := bar_index - extLen
-        
-        // Draw box from last high to this low (bearish impulse)
-        if showBoxes and not na(lastExtSH) and not na(lastExtSH_bar)
-            box.new(lastExtSH_bar, lastExtSH, lastExtSL_bar, extSL,
-                   bgcolor=bearBoxCol, border_color=color.new(bearCol, 60),
-                   border_width=1, extend=extend.right)
-        
-        extBosTriggered := false
-        extChochTriggered := false
-        lastSwingType := "low"
-        impulseStart := lastExtSH_bar
-        isSignificantLow := true
+    swingDirection := high[len] > upperLevel ? 0 : low[len] < lowerLevel ? 1 : swingDirection
 
-// Draw horizontal structure lines
-if showExtLines and isSignificantHigh
-    line.new(bar_index - extLen, lastExtSH, bar_index + 30, lastExtSH,
-             color=color.new(extCol, 30), style=line.style_solid, width=2)
+    if swingDirection == 0 and swingDirection[1] != 0
+        highPoint := swing.new(high[len], time[len])
+    if swingDirection == 1 and swingDirection[1] != 1
+        lowPoint := swing.new(low[len], time[len])
 
-if showExtLines and isSignificantLow
-    line.new(bar_index - extLen, lastExtSL, bar_index + 30, lastExtSL,
-             color=color.new(extCol, 30), style=line.style_solid, width=2)
+    [highPoint, lowPoint]
 
-// Check for EXTERNAL BOS/CHoCH on CLOSE
-if not na(lastExtSH) and not na(lastExtSL)
-    // Bullish Break of Structure: Close above last high while in uptrend
-    if close > lastExtSH and not extBosTriggered and extTrend == 1
-        if showLabels
-            label.new(bar_index, high, "BOS", style=label.style_label_up, 
-                     color=bosCol, textcolor=color.white, size=size.small)
-        extBosTriggered := true
+checkMarketStructure(crossed, direction, swingPrice, swingTime, lineColor, isExternal) =>
+    var market structure = isExternal ? externalStructure : internalStructure
+    structure.msbOrBos := na(structure.msbOrBos) ? "msb" : structure.direction == direction ? "bos" : "msb"
+    structure.direction := direction
     
-    // Bearish Break of Structure: Close below last low while in downtrend
-    if close < lastExtSL and not extBosTriggered and extTrend == -1
-        if showLabels
-            label.new(bar_index, low, "BOS", style=label.style_label_down, 
-                     color=bosCol, textcolor=color.white, size=size.small)
-        extBosTriggered := true
+    // Draw structure line
+    if showExtLines and isExternal or showIntLines and not isExternal
+        structure.marketLine := line.new(x1=swingTime, y1=swingPrice, x2=time, y2=swingPrice, 
+                                        xloc=xloc.bar_time, color=lineColor, 
+                                        style=isExternal ? line.style_solid : line.style_dashed, width=isExternal ? 2 : 1)
     
-    // Bullish Change of Character: Close above last high while in downtrend (reversal)
-    if close > lastExtSH and not extChochTriggered and extTrend == -1
-        if showLabels
-            label.new(bar_index, high, "CHoCH", style=label.style_label_up, 
-                     color=chochCol, textcolor=color.white, size=size.small)
-        extTrend := 1  // Trend changed to bullish
-        extChochTriggered := true
-        extBosTriggered := false
-    
-    // Bearish Change of Character: Close below last low while in uptrend (reversal)
-    if close < lastExtSL and not extChochTriggered and extTrend == 1
-        if showLabels
-            label.new(bar_index, low, "CHoCH", style=label.style_label_down, 
-                     color=chochCol, textcolor=color.white, size=size.small)
-        extTrend := -1  // Trend changed to bearish
-        extChochTriggered := true
-        extBosTriggered := false
-    
-    // Initialize trend if neutral
-    if extTrend == 0
-        if close > lastExtSH
-            extTrend := 1
-        else if close < lastExtSL
-            extTrend := -1
+    // Draw label
+    if showLabels
+        labelText = structure.msbOrBos == "msb" ? (isExternal ? "CHoCH+" : "CHoCH") : (isExternal ? "BoS+" : "BoS")
+        labelX = math.round(math.avg(swingTime, time))
+        structure.marketLabel := label.new(x=labelX, y=swingPrice, text=labelText, 
+                                          color=color.new(color.white, 100), textcolor=lineColor, 
+                                          style=direction == 1 ? label.style_label_down : label.style_label_up, 
+                                          xloc=xloc.bar_time, size=size.tiny)
 
 // ═══════════════════════════════════════════════════════════
-// INTERNAL STRUCTURE (Minor highs/lows within swing legs)
-// Only triggers BOS/CHoCH when CLOSE breaks the level
+// EXTERNAL STRUCTURE
 // ═══════════════════════════════════════════════════════════
-intSH = ta.pivothigh(high, intLen, intLen)
-intSL = ta.pivotlow(low,   intLen, intLen)
+var int extTrend = 0
+bool isExternalLowCrossed = false
+bool isExternalHighCrossed = false
 
-var float lastIntSH     = na
-var float lastIntSL     = na
-var int   lastIntSH_bar = na
-var int   lastIntSL_bar = na
-var int   intTrend      = 0  // 1=bullish, -1=bearish, 0=neutral
-var bool  intBosTriggered = false
-var bool  intChochTriggered = false
+[externalHigh, externalLow] = detectSwings(extLen)
 
-isExtHigh = not na(extSH)
-isExtLow  = not na(extSL)
+if close < externalLow.price and not externalLow.crossed
+    externalLow.crossed := true
+    isExternalLowCrossed := true
+    checkMarketStructure(true, -1, externalLow.price, externalLow.time, bearCol, true)
+    extTrend := -1
 
-// Detect new internal pivots (excluding external pivots)
-if not na(intSH) and not isExtHigh
-    lastIntSH     := intSH
-    lastIntSH_bar := bar_index - intLen
-    intBosTriggered := false
-    intChochTriggered := false
+else if close > externalHigh.price and not externalHigh.crossed
+    externalHigh.crossed := true
+    isExternalHighCrossed := true
+    checkMarketStructure(true, 1, externalHigh.price, externalHigh.time, bullCol, true)
+    extTrend := 1
 
-if not na(intSL) and not isExtLow
-    lastIntSL     := intSL
-    lastIntSL_bar := bar_index - intLen
-    intBosTriggered := false
-    intChochTriggered := false
+// ═══════════════════════════════════════════════════════════
+// INTERNAL STRUCTURE
+// ═══════════════════════════════════════════════════════════
+var int intTrend = 0
+bool isInternalLowCrossed = false
+bool isInternalHighCrossed = false
 
-// Draw internal structure lines
-if showIntLines and not na(intSH) and not isExtHigh
-    line.new(bar_index - intLen, intSH, bar_index + 10, intSH,
-             color=color.new(intCol, 40), style=line.style_dashed, width=1)
+[internalHigh, internalLow] = detectSwings(intLen)
 
-if showIntLines and not na(intSL) and not isExtLow
-    line.new(bar_index - intLen, intSL, bar_index + 10, intSL,
-             color=color.new(intCol, 40), style=line.style_dashed, width=1)
+if close < internalLow.price and not internalLow.crossed
+    internalLow.crossed := true
+    isInternalLowCrossed := true
+    checkMarketStructure(true, -1, internalLow.price, internalLow.time, bearCol, false)
+    intTrend := -1
 
-// Check for INTERNAL BOS/CHoCH on CLOSE
-if not na(lastIntSH) and not na(lastIntSL)
-    // Bullish Break of Structure: Close above last internal high while in uptrend
-    if close > lastIntSH and not intBosTriggered and intTrend == 1
-        if showLabels
-            label.new(bar_index, high, "iBOS", style=label.style_label_up, 
-                     color=color.new(bosCol, 30), textcolor=color.white, size=size.tiny)
-        intBosTriggered := true
-    
-    // Bearish Break of Structure: Close below last internal low while in downtrend
-    if close < lastIntSL and not intBosTriggered and intTrend == -1
-        if showLabels
-            label.new(bar_index, low, "iBOS", style=label.style_label_down, 
-                     color=color.new(bosCol, 30), textcolor=color.white, size=size.tiny)
-        intBosTriggered := true
-    
-    // Bullish Change of Character: Close above last internal high while in downtrend
-    if close > lastIntSH and not intChochTriggered and intTrend == -1
-        if showLabels
-            label.new(bar_index, high, "iCHoCH", style=label.style_label_up, 
-                     color=color.new(chochCol, 30), textcolor=color.white, size=size.tiny)
-        intTrend := 1
-        intChochTriggered := true
-        intBosTriggered := false
-    
-    // Bearish Change of Character: Close below last internal low while in uptrend
-    if close < lastIntSL and not intChochTriggered and intTrend == 1
-        if showLabels
-            label.new(bar_index, low, "iCHoCH", style=label.style_label_down, 
-                     color=color.new(chochCol, 30), textcolor=color.white, size=size.tiny)
-        intTrend := -1
-        intChochTriggered := true
-        intBosTriggered := false
-    
-    // Initialize internal trend if neutral
-    if intTrend == 0
-        if close > lastIntSH
-            intTrend := 1
-        else if close < lastIntSL
-            intTrend := -1
+else if close > internalHigh.price and not internalHigh.crossed
+    internalHigh.crossed := true
+    isInternalHighCrossed := true
+    checkMarketStructure(true, 1, internalHigh.price, internalHigh.time, bullCol, false)
+    intTrend := 1
 
 // ═══════════════════════════════════════════════════════════
 // MULTI-TIMEFRAME DATA FOR DASHBOARD

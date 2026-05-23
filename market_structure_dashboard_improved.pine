@@ -138,13 +138,11 @@ else if close > internalHigh.price and not internalHigh.crossed
 
 // Helper function to get structure trend for any timeframe
 getStructureTrend(tf) =>
-    [htfExtTrend, htfLastSH, htfLastSL] = request.security(syminfo.tickerid, tf, 
-         [extTrend, lastExtSH, lastExtSL], lookahead=barmerge.lookahead_off)
+    htfExtTrend = request.security(syminfo.tickerid, tf, extTrend, lookahead=barmerge.lookahead_off)
     htfExtTrend
 
 getStructureContext(tf) =>
-    [htfExtTrend, htfLastSH, htfLastSL, htfClose] = request.security(syminfo.tickerid, tf, 
-         [extTrend, lastExtSH, lastExtSL, close], lookahead=barmerge.lookahead_off)
+    htfExtTrend = request.security(syminfo.tickerid, tf, extTrend, lookahead=barmerge.lookahead_off)
     
     ctx = ""
     if htfExtTrend == 1
@@ -173,13 +171,12 @@ sw3Col   = sw3Trend == 1 ? bullCol : sw3Trend == -1 ? bearCol : color.new(#88888
 
 // --- INTERNAL STRUCTURE: Using same internal structure logic ---
 getInternalTrend(tf) =>
-    [htfIntTrend, htfLastIntSH, htfLastIntSL] = request.security(syminfo.tickerid, tf, 
-         [intTrend, lastIntSH, lastIntSL], lookahead=barmerge.lookahead_off)
+    htfIntTrend = request.security(syminfo.tickerid, tf, intTrend, lookahead=barmerge.lookahead_off)
     htfIntTrend
 
 getInternalStage(tf) =>
-    [htfIntTrend, htfExtTrend] = request.security(syminfo.tickerid, tf, 
-         [intTrend, extTrend], lookahead=barmerge.lookahead_off)
+    htfIntTrend = request.security(syminfo.tickerid, tf, intTrend, lookahead=barmerge.lookahead_off)
+    htfExtTrend = request.security(syminfo.tickerid, tf, extTrend, lookahead=barmerge.lookahead_off)
     
     stage = ""
     if htfIntTrend == htfExtTrend and htfIntTrend != 0

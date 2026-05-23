@@ -1,0 +1,321 @@
+//@version=5
+indicator("Market Structure Dashboard [Swing Trader] - Improved", overlay=true, max_bars_back=500, max_lines_count=300, max_labels_count=300)
+
+// ═══════════════════════════════════════════════════════════
+// INPUTS
+// ═══════════════════════════════════════════════════════════
+grp1 = "Structure Settings"
+extLen       = input.int(20, "External Swing Length", minval=5, maxval=100, group=grp1, tooltip="Larger pivots — major swing highs/lows")
+intLen       = input.int(7,  "Internal Swing Length", minval=2, maxval=30,  group=grp1, tooltip="Smaller pivots — minor highs/lows within each swing leg")
+
+grp2 = "Display"
+showExtLines = input.bool(true, "Show External Lines", group=grp2)
+showIntLines = input.bool(true, "Show Internal Lines", group=grp2)
+showLabels   = input.bool(true, "Show BOS/CHoCH Labels", group=grp2)
+showDash     = input.bool(true, "Show Dashboard",      group=grp2)
+dashPos      = input.string("Top Right", "Dashboard Position", options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=grp2)
+
+grp3 = "Colors"
+extCol  = input.color(color.new(#00BCD4, 0), "External Structure", group=grp3)
+intCol  = input.color(color.new(#9C27B0, 0), "Internal Structure", group=grp3)
+bullCol = input.color(color.new(#00e676, 0), "Bullish",            group=grp3)
+bearCol = input.color(color.new(#ff1744, 0), "Bearish",            group=grp3)
+bosCol  = input.color(color.new(#2196F3, 0), "BOS Color",          group=grp3)
+chochCol = input.color(color.new(#FF9800, 0), "CHoCH Color",       group=grp3)
+
+// ═══════════════════════════════════════════════════════════
+// TIMEFRAME INPUTS
+// ═══════════════════════════════════════════════════════════
+grp4 = "Swing Structure Timeframes"
+swingTF1 = input.timeframe("W",   "Swing TF 1", group=grp4, tooltip="First swing structure timeframe")
+swingTF2 = input.timeframe("D",   "Swing TF 2", group=grp4, tooltip="Second swing structure timeframe")
+swingTF3 = input.timeframe("240", "Swing TF 3", group=grp4, tooltip="Third swing structure timeframe (240 = 4H)")
+
+grp5 = "Internal Structure Timeframes"
+intTF1 = input.timeframe("240", "Internal TF 1", group=grp5, tooltip="First internal structure timeframe (240 = 4H)")
+intTF2 = input.timeframe("60",  "Internal TF 2", group=grp5, tooltip="Second internal structure timeframe (60 = 1H)")
+
+// ═══════════════════════════════════════════════════════════
+// EXTERNAL STRUCTURE (Major swing highs/lows)
+// Only triggers BOS/CHoCH when CLOSE breaks the level
+// ═══════════════════════════════════════════════════════════
+extSH = ta.pivothigh(high, extLen, extLen)
+extSL = ta.pivotlow(low,   extLen, extLen)
+
+var float lastExtSH     = na
+var float lastExtSL     = na
+var int   lastExtSH_bar = na
+var int   lastExtSL_bar = na
+var float prevExtSH     = na
+var float prevExtSL     = na
+var int   extTrend      = 0  // 1=bullish, -1=bearish, 0=neutral
+var bool  extBosTriggered = false
+var bool  extChochTriggered = false
+
+// Detect new external pivots
+if not na(extSH)
+    prevExtSH     := lastExtSH
+    lastExtSH     := extSH
+    lastExtSH_bar := bar_index - extLen
+    extBosTriggered := false
+    extChochTriggered := false
+
+if not na(extSL)
+    prevExtSL     := lastExtSL
+    lastExtSL     := extSL
+    lastExtSL_bar := bar_index - extLen
+    extBosTriggered := false
+    extChochTriggered := false
+
+// Draw external structure lines
+if showExtLines and not na(extSH)
+    line.new(bar_index - extLen, extSH, bar_index + 20, extSH,
+             color=color.new(extCol, 30), style=line.style_solid, width=2)
+
+if showExtLines and not na(extSL)
+    line.new(bar_index - extLen, extSL, bar_index + 20, extSL,
+             color=color.new(extCol, 30), style=line.style_solid, width=2)
+
+// Check for EXTERNAL BOS/CHoCH on CLOSE
+if not na(lastExtSH) and not na(lastExtSL)
+    // Bullish Break of Structure: Close above last high while in uptrend
+    if close > lastExtSH and not extBosTriggered and extTrend == 1
+        if showLabels
+            label.new(bar_index, high, "BOS", style=label.style_label_up, 
+                     color=bosCol, textcolor=color.white, size=size.small)
+        extBosTriggered := true
+    
+    // Bearish Break of Structure: Close below last low while in downtrend
+    if close < lastExtSL and not extBosTriggered and extTrend == -1
+        if showLabels
+            label.new(bar_index, low, "BOS", style=label.style_label_down, 
+                     color=bosCol, textcolor=color.white, size=size.small)
+        extBosTriggered := true
+    
+    // Bullish Change of Character: Close above last high while in downtrend (reversal)
+    if close > lastExtSH and not extChochTriggered and extTrend == -1
+        if showLabels
+            label.new(bar_index, high, "CHoCH", style=label.style_label_up, 
+                     color=chochCol, textcolor=color.white, size=size.small)
+        extTrend := 1  // Trend changed to bullish
+        extChochTriggered := true
+        extBosTriggered := false
+    
+    // Bearish Change of Character: Close below last low while in uptrend (reversal)
+    if close < lastExtSL and not extChochTriggered and extTrend == 1
+        if showLabels
+            label.new(bar_index, low, "CHoCH", style=label.style_label_down, 
+                     color=chochCol, textcolor=color.white, size=size.small)
+        extTrend := -1  // Trend changed to bearish
+        extChochTriggered := true
+        extBosTriggered := false
+    
+    // Initialize trend if neutral
+    if extTrend == 0
+        if close > lastExtSH
+            extTrend := 1
+        else if close < lastExtSL
+            extTrend := -1
+
+// ═══════════════════════════════════════════════════════════
+// INTERNAL STRUCTURE (Minor highs/lows within swing legs)
+// Only triggers BOS/CHoCH when CLOSE breaks the level
+// ═══════════════════════════════════════════════════════════
+intSH = ta.pivothigh(high, intLen, intLen)
+intSL = ta.pivotlow(low,   intLen, intLen)
+
+var float lastIntSH     = na
+var float lastIntSL     = na
+var int   lastIntSH_bar = na
+var int   lastIntSL_bar = na
+var int   intTrend      = 0  // 1=bullish, -1=bearish, 0=neutral
+var bool  intBosTriggered = false
+var bool  intChochTriggered = false
+
+isExtHigh = not na(extSH)
+isExtLow  = not na(extSL)
+
+// Detect new internal pivots (excluding external pivots)
+if not na(intSH) and not isExtHigh
+    lastIntSH     := intSH
+    lastIntSH_bar := bar_index - intLen
+    intBosTriggered := false
+    intChochTriggered := false
+
+if not na(intSL) and not isExtLow
+    lastIntSL     := intSL
+    lastIntSL_bar := bar_index - intLen
+    intBosTriggered := false
+    intChochTriggered := false
+
+// Draw internal structure lines
+if showIntLines and not na(intSH) and not isExtHigh
+    line.new(bar_index - intLen, intSH, bar_index + 10, intSH,
+             color=color.new(intCol, 40), style=line.style_dashed, width=1)
+
+if showIntLines and not na(intSL) and not isExtLow
+    line.new(bar_index - intLen, intSL, bar_index + 10, intSL,
+             color=color.new(intCol, 40), style=line.style_dashed, width=1)
+
+// Check for INTERNAL BOS/CHoCH on CLOSE
+if not na(lastIntSH) and not na(lastIntSL)
+    // Bullish Break of Structure: Close above last internal high while in uptrend
+    if close > lastIntSH and not intBosTriggered and intTrend == 1
+        if showLabels
+            label.new(bar_index, high, "iBOS", style=label.style_label_up, 
+                     color=color.new(bosCol, 30), textcolor=color.white, size=size.tiny)
+        intBosTriggered := true
+    
+    // Bearish Break of Structure: Close below last internal low while in downtrend
+    if close < lastIntSL and not intBosTriggered and intTrend == -1
+        if showLabels
+            label.new(bar_index, low, "iBOS", style=label.style_label_down, 
+                     color=color.new(bosCol, 30), textcolor=color.white, size=size.tiny)
+        intBosTriggered := true
+    
+    // Bullish Change of Character: Close above last internal high while in downtrend
+    if close > lastIntSH and not intChochTriggered and intTrend == -1
+        if showLabels
+            label.new(bar_index, high, "iCHoCH", style=label.style_label_up, 
+                     color=color.new(chochCol, 30), textcolor=color.white, size=size.tiny)
+        intTrend := 1
+        intChochTriggered := true
+        intBosTriggered := false
+    
+    // Bearish Change of Character: Close below last internal low while in uptrend
+    if close < lastIntSL and not intChochTriggered and intTrend == 1
+        if showLabels
+            label.new(bar_index, low, "iCHoCH", style=label.style_label_down, 
+                     color=color.new(chochCol, 30), textcolor=color.white, size=size.tiny)
+        intTrend := -1
+        intChochTriggered := true
+        intBosTriggered := false
+    
+    // Initialize internal trend if neutral
+    if intTrend == 0
+        if close > lastIntSH
+            intTrend := 1
+        else if close < lastIntSL
+            intTrend := -1
+
+// ═══════════════════════════════════════════════════════════
+// MULTI-TIMEFRAME DATA FOR DASHBOARD
+// ═══════════════════════════════════════════════════════════
+
+// --- SWING STRUCTURE: Using custom timeframes ---
+sw1High = request.security(syminfo.tickerid, swingTF1, ta.highest(high, 3)[1], lookahead=barmerge.lookahead_on)
+sw1Bull = close > sw1High
+sw1Dir  = sw1Bull ? "Bullish" : "Bearish"
+sw1Ctx  = sw1Bull ? "Close > Prev High" : "Close < Prev Low"
+sw1Col  = sw1Bull ? bullCol : bearCol
+
+sw2High = request.security(syminfo.tickerid, swingTF2, high[1], lookahead=barmerge.lookahead_on)
+sw2Bull = close > sw2High
+sw2Dir  = sw2Bull ? "Bullish" : "Bearish"
+sw2Ctx  = sw2Bull ? "Close > Prev High" : "Close < Prev Low"
+sw2Col  = sw2Bull ? bullCol : bearCol
+
+sw3High = request.security(syminfo.tickerid, swingTF3, ta.highest(high, 20)[1], lookahead=barmerge.lookahead_on)
+sw3Cls  = request.security(syminfo.tickerid, swingTF3, close, lookahead=barmerge.lookahead_on)
+sw3Bull = sw3Cls > sw3High
+sw3Dir  = sw3Bull ? "Bullish" : "Bearish"
+sw3Ctx  = sw3Bull ? "Close > Prev High" : "Close < Prev Low"
+sw3Col  = sw3Bull ? bullCol : bearCol
+
+// --- INTERNAL STRUCTURE: Using custom timeframes ---
+int1High = request.security(syminfo.tickerid, intTF1, ta.highest(high, 20)[1], lookahead=barmerge.lookahead_on)
+int1Cls  = request.security(syminfo.tickerid, intTF1, close, lookahead=barmerge.lookahead_on)
+int1Bull = int1Cls > int1High
+int1Dir  = int1Bull ? "Bullish" : "Bearish"
+int1Stg  = int1Bull ? "Expansion" : "Confirmed Shift"
+int1Col  = int1Bull ? bullCol : bearCol
+
+int2High = request.security(syminfo.tickerid, intTF2, ta.highest(high, 20)[1], lookahead=barmerge.lookahead_on)
+int2Cls  = request.security(syminfo.tickerid, intTF2, close, lookahead=barmerge.lookahead_on)
+int2Bull = int2Cls > int2High
+int2Dir  = int2Bull ? "Bullish" : "Bearish"
+int2Stg  = int2Bull ? "Expansion" : "Retracement"
+int2Col  = int2Bull ? bullCol : bearCol
+
+// Chart TF live
+chartExtDir = extTrend ==  1 ? "Bullish" : extTrend == -1 ? "Bearish" : "Neutral"
+chartExtCol = extTrend ==  1 ? bullCol   : extTrend == -1 ? bearCol   : color.new(#888888, 0)
+chartIntDir = intTrend ==  1 ? "Bullish" : intTrend == -1 ? "Bearish" : "Neutral"
+chartIntCol = intTrend ==  1 ? bullCol   : intTrend == -1 ? bearCol   : color.new(#888888, 0)
+
+// ═══════════════════════════════════════════════════════════
+// DASHBOARD TABLE
+// ═══════════════════════════════════════════════════════════
+var table dash = na
+
+tPos = switch dashPos
+    "Top Right"    => position.top_right
+    "Top Left"     => position.top_left
+    "Bottom Right" => position.bottom_right
+    "Bottom Left"  => position.bottom_left
+    => position.top_right
+
+bgDark   = color.new(#0d0d1a, 5)
+bgHeader = color.new(#1a1a2e, 10)
+bgRow    = color.new(#12122a, 20)
+txtWhite = color.new(#e0e0e0, 0)
+dimGrey  = color.new(#aaaaaa, 0)
+
+if showDash and barstate.islast
+    dash := table.new(tPos, 3, 12,
+                      bgcolor=bgDark,
+                      border_color=color.new(#333355, 0),
+                      border_width=1,
+                      frame_color=color.new(#5555aa, 0),
+                      frame_width=2)
+
+    // ── SWING STRUCTURE ──────────────────
+    table.cell(dash, 0, 0, "  SWING STRUCTURE  ", text_color=txtWhite,
+               bgcolor=bgHeader, text_size=size.normal, text_halign=text.align_center)
+    table.merge_cells(dash, 0, 0, 2, 0)
+
+    table.cell(dash, 0, 1, "  TF  ",      text_color=dimGrey, bgcolor=bgRow, text_size=size.small, text_halign=text.align_center)
+    table.cell(dash, 1, 1, "  Direction", text_color=dimGrey, bgcolor=bgRow, text_size=size.small, text_halign=text.align_center)
+    table.cell(dash, 2, 1, "  Context  ", text_color=dimGrey, bgcolor=bgRow, text_size=size.small, text_halign=text.align_center)
+
+    table.cell(dash, 0, 2, "  " + swingTF1, text_color=dimGrey, bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 2, "  " + sw1Dir,   text_color=sw1Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 2, 2, "  " + sw1Ctx,   text_color=sw1Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+
+    table.cell(dash, 0, 3, "  " + swingTF2, text_color=dimGrey, bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 3, "  " + sw2Dir,   text_color=sw2Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 2, 3, "  " + sw2Ctx,   text_color=sw2Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+
+    table.cell(dash, 0, 4, "  " + swingTF3, text_color=dimGrey, bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 4, "  " + sw3Dir,   text_color=sw3Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 2, 4, "  " + sw3Ctx,   text_color=sw3Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+
+    // spacer
+    table.cell(dash, 0, 5, " ", bgcolor=color.new(#0d0d1a, 80))
+    table.merge_cells(dash, 0, 5, 2, 5)
+
+    // ── INTERNAL STRUCTURE ───────────────
+    table.cell(dash, 0, 6, "  INTERNAL STRUCTURE  ", text_color=txtWhite,
+               bgcolor=bgHeader, text_size=size.normal, text_halign=text.align_center)
+    table.merge_cells(dash, 0, 6, 2, 6)
+
+    table.cell(dash, 0, 7, "  TF  ",      text_color=dimGrey, bgcolor=bgRow, text_size=size.small, text_halign=text.align_center)
+    table.cell(dash, 1, 7, "  Direction", text_color=dimGrey, bgcolor=bgRow, text_size=size.small, text_halign=text.align_center)
+    table.cell(dash, 2, 7, "  Stage  ",   text_color=dimGrey, bgcolor=bgRow, text_size=size.small, text_halign=text.align_center)
+
+    table.cell(dash, 0, 8, "  " + intTF1,  text_color=dimGrey,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 8, "  " + int1Dir, text_color=int1Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 2, 8, "  " + int1Stg, text_color=int1Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+
+    table.cell(dash, 0, 9, "  " + intTF2,  text_color=dimGrey,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 9, "  " + int2Dir, text_color=int2Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 2, 9, "  " + int2Stg, text_color=int2Col,  bgcolor=bgDark, text_size=size.small, text_halign=text.align_left)
+
+    // spacer
+    table.cell(dash, 0, 10, " ", bgcolor=color.new(#0d0d1a, 80))
+    table.merge_cells(dash, 0, 10, 2, 10)
+
+    // Chart TF live row
+    table.cell(dash, 0, 11, "  Chart TF",            text_color=dimGrey,     bgcolor=bgRow, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 1, 11, "  Ext: " + chartExtDir, text_color=chartExtCol, bgcolor=bgRow, text_size=size.small, text_halign=text.align_left)
+    table.cell(dash, 2, 11, "  Int: " + chartIntDir, text_color=chartIntCol, bgcolor=bgRow, text_size=size.small, text_halign=text.align_left)

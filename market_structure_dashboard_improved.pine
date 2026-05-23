@@ -1,5 +1,5 @@
 //@version=5
-indicator("Market Structure Dashboard [Swing Trader] - Improved", overlay=true, max_bars_back=500, max_lines_count=300, max_labels_count=300)
+indicator("Market Structure Dashboard [Swing Trader] - Improved", overlay=true, max_bars_back=500, max_lines_count=300, max_labels_count=300, max_boxes_count=100)
 
 // ═══════════════════════════════════════════════════════════
 // INPUTS
@@ -11,6 +11,7 @@ intLen       = input.int(15,  "Internal Swing Length", minval=5, maxval=50,  gro
 grp2 = "Display"
 showExtLines = input.bool(true, "Show External Lines", group=grp2)
 showIntLines = input.bool(true, "Show Internal Lines", group=grp2)
+showBoxes    = input.bool(true, "Show Impulse Boxes", group=grp2, tooltip="Draw boxes around impulse moves that break structure")
 showLabels   = input.bool(true, "Show BOS/CHoCH Labels", group=grp2)
 showDash     = input.bool(true, "Show Dashboard",      group=grp2)
 dashPos      = input.string("Top Right", "Dashboard Position", options=["Top Right","Top Left","Bottom Right","Bottom Left"], group=grp2)
@@ -22,6 +23,8 @@ bullCol = input.color(color.new(#00e676, 0), "Bullish",            group=grp3)
 bearCol = input.color(color.new(#ff1744, 0), "Bearish",            group=grp3)
 bosCol  = input.color(color.new(#2196F3, 0), "BOS Color",          group=grp3)
 chochCol = input.color(color.new(#FF9800, 0), "CHoCH Color",       group=grp3)
+bullBoxCol = input.color(color.new(#4caf50, 85), "Bullish Impulse Box", group=grp3)
+bearBoxCol = input.color(color.new(#f44336, 85), "Bearish Impulse Box", group=grp3)
 
 // ═══════════════════════════════════════════════════════════
 // TIMEFRAME INPUTS
@@ -39,6 +42,7 @@ intTF2 = input.timeframe("60",  "Internal TF 2", group=grp5, tooltip="Second int
 // EXTERNAL STRUCTURE (Major swing highs/lows)
 // Only triggers BOS/CHoCH when CLOSE breaks the level
 // Creates ZIGZAG pattern - alternating highs and lows only
+// Draws BOXES around impulse moves
 // ═══════════════════════════════════════════════════════════
 extSH = ta.pivothigh(high, extLen, extLen)
 extSL = ta.pivotlow(low,   extLen, extLen)
@@ -53,6 +57,7 @@ var int   extTrend      = 0  // 1=bullish, -1=bearish, 0=neutral
 var bool  extBosTriggered = false
 var bool  extChochTriggered = false
 var string lastSwingType = "none"  // Track if last swing was "high" or "low" for zigzag pattern
+var int impulseStart = na  // Track where impulse started
 
 // Detect new external pivots - ZIGZAG LOGIC
 // Only accept a high after a low, and a low after a high
@@ -60,34 +65,44 @@ bool isSignificantHigh = false
 bool isSignificantLow = false
 
 if not na(extSH)
-    // Only accept this high if:
-    // 1. We haven't recorded any swing yet (first one)
-    // 2. Last swing was a LOW (creating zigzag)
-    // 3. This high is higher than previous high (making progress)
+    // Only accept this high if last swing was a LOW (creating zigzag)
     if lastSwingType == "none" or (lastSwingType == "low" and (na(lastExtSH) or extSH > lastExtSH))
         prevExtSH     := lastExtSH
         lastExtSH     := extSH
         lastExtSH_bar := bar_index - extLen
+        
+        // Draw box from last low to this high (bullish impulse)
+        if showBoxes and not na(lastExtSL) and not na(lastExtSL_bar)
+            box.new(lastExtSL_bar, lastExtSL, lastExtSH_bar, extSH,
+                   bgcolor=bullBoxCol, border_color=color.new(bullCol, 60), 
+                   border_width=1, extend=extend.right)
+        
         extBosTriggered := false
         extChochTriggered := false
         lastSwingType := "high"
+        impulseStart := lastExtSL_bar
         isSignificantHigh := true
 
 if not na(extSL)
-    // Only accept this low if:
-    // 1. We haven't recorded any swing yet (first one)
-    // 2. Last swing was a HIGH (creating zigzag)
-    // 3. This low is lower than previous low (making progress)
+    // Only accept this low if last swing was a HIGH (creating zigzag)
     if lastSwingType == "none" or (lastSwingType == "high" and (na(lastExtSL) or extSL < lastExtSL))
         prevExtSL     := lastExtSL
         lastExtSL     := extSL
         lastExtSL_bar := bar_index - extLen
+        
+        // Draw box from last high to this low (bearish impulse)
+        if showBoxes and not na(lastExtSH) and not na(lastExtSH_bar)
+            box.new(lastExtSH_bar, lastExtSH, lastExtSL_bar, extSL,
+                   bgcolor=bearBoxCol, border_color=color.new(bearCol, 60),
+                   border_width=1, extend=extend.right)
+        
         extBosTriggered := false
         extChochTriggered := false
         lastSwingType := "low"
+        impulseStart := lastExtSH_bar
         isSignificantLow := true
 
-// Draw external structure lines - ONLY for zigzag swings
+// Draw horizontal structure lines
 if showExtLines and isSignificantHigh
     line.new(bar_index - extLen, lastExtSH, bar_index + 30, lastExtSH,
              color=color.new(extCol, 30), style=line.style_solid, width=2)

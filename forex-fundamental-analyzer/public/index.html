@@ -17,6 +17,7 @@
             <div class="tab-buttons">
                 <button class="tab-btn active" data-tab="currency">Single Currency</button>
                 <button class="tab-btn" data-tab="pair">Currency Pair</button>
+                <button class="tab-btn" data-tab="chart">Chart Analysis</button>
             </div>
         </div>
 
@@ -144,6 +145,78 @@
                         <div class="news-column">
                             <h3 id="quote-news-title">📰 Quote Currency News</h3>
                             <div id="quote-news"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Chart Analysis Tab -->
+        <div class="tab-content" id="chart-tab">
+            <div class="search-section">
+                <label for="currency-select-chart">Select Currency Pair:</label>
+                <select id="currency-select-chart">
+                    <option value="">Choose a pair for analysis...</option>
+                </select>
+                
+                <label style="margin-top: 20px;">Upload Your Chart:</label>
+                <div class="upload-area" id="upload-area">
+                    <div class="upload-icon">📊</div>
+                    <p class="upload-text">Drag & Drop your chart image here</p>
+                    <p class="upload-subtext">or click to browse</p>
+                    <input type="file" id="chart-upload" accept="image/*" hidden>
+                </div>
+                
+                <div id="image-preview" class="image-preview hidden">
+                    <img id="preview-img" src="" alt="Chart preview">
+                    <button id="remove-image" class="remove-btn">✕ Remove</button>
+                </div>
+                
+                <button id="analyze-chart-btn" class="analyze-btn" disabled>Analyze Chart</button>
+            </div>
+            
+            <div id="chart-results" class="results hidden">
+                <div class="result-card">
+                    <h2 id="chart-pair-name"></h2>
+                    
+                    <div class="comparison-grid">
+                        <div class="analysis-box technical">
+                            <h3>📈 Technical Analysis</h3>
+                            <div class="outlook-badge" id="technical-outlook"></div>
+                            <div class="analysis-content" id="technical-analysis"></div>
+                        </div>
+                        
+                        <div class="alignment-indicator" id="alignment-status">
+                            <div class="alignment-icon">↔️</div>
+                            <div class="alignment-text">Checking alignment...</div>
+                        </div>
+                        
+                        <div class="analysis-box fundamental">
+                            <h3>📰 Fundamental Bias</h3>
+                            <div class="outlook-badge" id="fundamental-outlook"></div>
+                            <div class="analysis-content" id="fundamental-analysis"></div>
+                        </div>
+                    </div>
+                    
+                    <div class="ai-verdict">
+                        <h3>🤖 AI Verdict</h3>
+                        <p id="verdict-text"></p>
+                    </div>
+                    
+                    <div class="chart-details">
+                        <div class="detail-section">
+                            <h3>🔍 Chart Patterns Detected</h3>
+                            <div id="patterns-list"></div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h3>📊 Key Levels</h3>
+                            <div id="levels-list"></div>
+                        </div>
+                        
+                        <div class="detail-section">
+                            <h3>🎯 Trade Recommendation</h3>
+                            <div id="recommendation-text"></div>
                         </div>
                     </div>
                 </div>

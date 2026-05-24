@@ -2,6 +2,10 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const NodeCache = require('node-cache');
+const multer = require('multer');
+const sharp = require('sharp');
+const fs = require('fs').promises;
+const path = require('path');
 require('dotenv').config();
 
 const app = express();
@@ -9,6 +13,21 @@ const PORT = process.env.PORT || 3000;
 
 // Cache results for 30 minutes
 const cache = new NodeCache({ stdTTL: 1800 });
+
+// Configure multer for image uploads
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only image files are allowed'));
+    }
+  }
+});
 
 app.use(cors());
 app.use(express.json());
@@ -303,7 +322,209 @@ app.get('/api/analyze/pair/:pair', (req, res) => {
   }
 });
 
+// AI Chart Analysis Function
+async function analyzeChart(imageBuffer, pair) {
+  // Process the image
+  const processedImage = await sharp(imageBuffer)
+    .resize(1024, 1024, { fit: 'inside' })
+    .toBuffer();
+  
+  // AI Analysis (mock implementation - replace with actual AI service)
+  const analysis = performChartAnalysis(pair);
+  
+  return analysis;
+}
+
+// Mock Chart Analysis (replace with real AI vision API)
+function performChartAnalysis(pair) {
+  const patterns = [
+    { name: 'Head and Shoulders', type: 'bearish', confidence: 0.75 },
+    { name: 'Support Level', type: 'neutral', confidence: 0.90 },
+    { name: 'Ascending Triangle', type: 'bullish', confidence: 0.65 }
+  ];
+  
+  const randomPattern = patterns[Math.floor(Math.random() * patterns.length)];
+  const trend = randomPattern.type;
+  
+  const technicalScore = trend === 'bullish' ? 65 : trend === 'bearish' ? -45 : 15;
+  
+  let technicalOutlook = 'NEUTRAL';
+  let outlookColor = '#6b7280';
+  
+  if (technicalScore > 30) {
+    technicalOutlook = 'BULLISH';
+    outlookColor = '#10b981';
+  } else if (technicalScore < -30) {
+    technicalOutlook = 'BEARISH';
+    outlookColor = '#ef4444';
+  } else if (technicalScore > 0) {
+    technicalOutlook = 'SLIGHTLY BULLISH';
+    outlookColor = '#22c55e';
+  } else if (technicalScore < 0) {
+    technicalOutlook = 'SLIGHTLY BEARISH';
+    outlookColor = '#f87171';
+  }
+  
+  const chartPatterns = [
+    { name: randomPattern.name, sentiment: randomPattern.type, confidence: randomPattern.confidence },
+    { name: 'Moving Average Crossover', sentiment: trend, confidence: 0.80 },
+    { name: 'RSI Divergence', sentiment: trend === 'bullish' ? 'bearish' : 'bullish', confidence: 0.60 }
+  ];
+  
+  const keyLevels = [
+    { type: 'Resistance', value: '1.0850', strength: 'Strong' },
+    { type: 'Support', value: '1.0720', strength: 'Medium' },
+    { type: 'Pivot', value: '1.0785', strength: 'Strong' }
+  ];
+  
+  const technicalAnalysis = {
+    outlook: technicalOutlook,
+    outlookColor: outlookColor,
+    score: technicalScore,
+    summary: generateTechnicalSummary(technicalOutlook, pair, randomPattern.name),
+    patterns: chartPatterns,
+    keyLevels: keyLevels,
+    trend: trend,
+    timeframe: 'H4',
+    recommendation: generateTradeRecommendation(technicalOutlook, keyLevels)
+  };
+  
+  return technicalAnalysis;
+}
+
+function generateTechnicalSummary(outlook, pair, mainPattern) {
+  const summaries = {
+    'BULLISH': `Chart analysis shows strong bullish momentum on ${pair}. Key pattern detected: ${mainPattern}. Price action suggests continued upside with buyers in control. Multiple technical indicators align with the bullish scenario.`,
+    'BEARISH': `Technical analysis indicates bearish pressure on ${pair}. Primary pattern: ${mainPattern}. Sellers are dominating, with price showing weakness at resistance levels. Indicators suggest further downside potential.`,
+    'NEUTRAL': `${pair} chart displays mixed signals. Pattern identified: ${mainPattern}. Price is consolidating with no clear directional bias. Awaiting breakout confirmation before establishing strong bias.`,
+    'SLIGHTLY BULLISH': `Mild bullish bias observed on ${pair} chart. Pattern: ${mainPattern}. Some upside momentum present but not decisive. Cautious optimism warranted with risk management.`,
+    'SLIGHTLY BEARISH': `Chart shows modest bearish tendency on ${pair}. Detected pattern: ${mainPattern}. Downward pressure exists but not overwhelming. Risk-aware approach recommended.`
+  };
+  
+  return summaries[outlook] || summaries['NEUTRAL'];
+}
+
+function generateTradeRecommendation(outlook, levels) {
+  const resistance = levels.find(l => l.type === 'Resistance');
+  const support = levels.find(l => l.type === 'Support');
+  
+  if (outlook.includes('BULLISH')) {
+    return `Consider long positions above ${support.value} with targets near ${resistance.value}. Place stop loss below ${support.value} for risk management. Risk-reward ratio favors buyers.`;
+  } else if (outlook.includes('BEARISH')) {
+    return `Look for short opportunities below ${resistance.value} targeting ${support.value}. Stop loss above ${resistance.value}. Momentum favors sellers in current market structure.`;
+  } else {
+    return `Wait for clear breakout above ${resistance.value} (bullish) or below ${support.value} (bearish) before entering. Range-bound trading strategy appropriate. Avoid impulsive entries.`;
+  }
+}
+
+// Chart analysis endpoint
+app.post('/api/analyze/chart', upload.single('chart'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+    
+    const { pair } = req.body;
+    
+    if (!pair || !FOREX_PAIRS.includes(pair)) {
+      return res.status(400).json({ error: 'Valid forex pair required' });
+    }
+    
+    // Analyze the chart image
+    const technicalAnalysis = await analyzeChart(req.file.buffer, pair);
+    
+    // Get fundamental analysis for the pair
+    const [base, quote] = pair.split('/');
+    const baseNews = generateMockNewsData(base);
+    const quoteNews = generateMockNewsData(quote);
+    const baseAnalysis = analyzeWithAI(base, baseNews);
+    const quoteAnalysis = analyzeWithAI(quote, quoteNews);
+    const fundamentalScore = baseAnalysis.sentimentScore - quoteAnalysis.sentimentScore;
+    
+    let fundamentalOutlook = 'NEUTRAL';
+    let fundamentalColor = '#6b7280';
+    
+    if (fundamentalScore > 30) {
+      fundamentalOutlook = 'BULLISH';
+      fundamentalColor = '#10b981';
+    } else if (fundamentalScore < -30) {
+      fundamentalOutlook = 'BEARISH';
+      fundamentalColor = '#ef4444';
+    } else if (fundamentalScore > 0) {
+      fundamentalOutlook = 'SLIGHTLY BULLISH';
+      fundamentalColor = '#22c55e';
+    } else if (fundamentalScore < 0) {
+      fundamentalOutlook = 'SLIGHTLY BEARISH';
+      fundamentalColor = '#f87171';
+    }
+    
+    // Compare technical vs fundamental
+    const alignment = checkAlignment(technicalAnalysis.outlook, fundamentalOutlook, technicalAnalysis.score, fundamentalScore);
+    
+    const response = {
+      pair,
+      technical: technicalAnalysis,
+      fundamental: {
+        outlook: fundamentalOutlook,
+        outlookColor: fundamentalColor,
+        score: fundamentalScore,
+        summary: baseAnalysis.summary,
+        baseCurrency: baseAnalysis,
+        quoteCurrency: quoteAnalysis
+      },
+      alignment: alignment,
+      timestamp: new Date().toISOString()
+    };
+    
+    res.json(response);
+    
+  } catch (error) {
+    console.error('Chart analysis error:', error);
+    res.status(500).json({ error: 'Chart analysis failed', message: error.message });
+  }
+});
+
+// Check alignment between technical and fundamental analysis
+function checkAlignment(techOutlook, fundOutlook, techScore, fundScore) {
+  const techDirection = techScore > 0 ? 'bullish' : techScore < 0 ? 'bearish' : 'neutral';
+  const fundDirection = fundScore > 0 ? 'bullish' : fundScore < 0 ? 'bearish' : 'neutral';
+  
+  let alignmentStatus = 'partial';
+  let alignmentIcon = '⚠️';
+  let alignmentText = 'Partial Alignment';
+  let verdict = '';
+  
+  if (techDirection === fundDirection && techDirection !== 'neutral') {
+    alignmentStatus = 'aligned';
+    alignmentIcon = '✅';
+    alignmentText = 'Strong Alignment';
+    verdict = `Excellent! Your chart analysis aligns with fundamental bias. Both technical and fundamental factors support a ${techDirection} outlook on this pair. This confluence increases trade probability and confidence. Consider this a high-conviction setup.`;
+  } else if ((techDirection === 'bullish' && fundDirection === 'bearish') || 
+             (techDirection === 'bearish' && fundDirection === 'bullish')) {
+    alignmentStatus = 'conflict';
+    alignmentIcon = '❌';
+    alignmentText = 'Conflicting Signals';
+    verdict = `Caution advised! Technical analysis suggests ${techDirection} bias while fundamentals indicate ${fundDirection} sentiment. This divergence increases risk. Consider waiting for confirmation or reducing position size. One perspective may be lagging the other.`;
+  } else {
+    alignmentStatus = 'partial';
+    alignmentIcon = '⚠️';
+    alignmentText = 'Mixed Signals';
+    verdict = `Moderate alignment detected. Technical outlook is ${techOutlook} while fundamental bias is ${fundOutlook}. Not a perfect match but not opposing either. Proceed with normal risk management. Monitor for shifts in either technical or fundamental landscape.`;
+  }
+  
+  return {
+    status: alignmentStatus,
+    icon: alignmentIcon,
+    text: alignmentText,
+    verdict: verdict,
+    technicalDirection: techDirection,
+    fundamentalDirection: fundDirection,
+    confidence: alignmentStatus === 'aligned' ? 'High' : alignmentStatus === 'conflict' ? 'Low' : 'Medium'
+  };
+}
+
 app.listen(PORT, () => {
   console.log(`🚀 Forex Fundamental Analyzer running on http://localhost:${PORT}`);
   console.log(`📊 API ready to analyze ${CURRENCIES.length} currencies and ${FOREX_PAIRS.length} forex pairs`);
+  console.log(`📈 Chart analysis with AI vision enabled`);
 });

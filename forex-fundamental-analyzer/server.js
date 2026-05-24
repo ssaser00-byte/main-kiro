@@ -545,6 +545,98 @@ function checkAlignment(techOutlook, fundOutlook, techScore, fundScore) {
   };
 }
 
+// Chat endpoint - AI responds to user questions about their analysis
+app.post('/api/chat', express.json(), (req, res) => {
+  try {
+    const { message, context } = req.body;
+    
+    if (!message || !context) {
+      return res.status(400).json({ error: 'Message and context required' });
+    }
+    
+    const response = generateChatResponse(message, context);
+    res.json({ response });
+    
+  } catch (error) {
+    console.error('Chat error:', error);
+    res.status(500).json({ error: 'Chat processing failed', message: error.message });
+  }
+});
+
+// Generate AI chat responses based on context
+function generateChatResponse(message, context) {
+  const msgLower = message.toLowerCase();
+  const { pair, technical, fundamental, alignment } = context;
+  
+  // Pattern matching for common questions
+  if (msgLower.includes('why') && (msgLower.includes('probability') || msgLower.includes('%'))) {
+    return `The ${alignment.probabilityPercent}% probability is calculated based on the alignment between your technical and fundamental analysis. Since your chart shows a ${technical.outlook} outlook (score: ${technical.score}) and the fundamental bias is ${fundamental.outlook} (score: ${fundamental.score}), they are ${alignment.status}. ${alignment.status === 'aligned' ? 'When both factors agree in the same direction, the probability of reaching your take profit increases significantly.' : alignment.status === 'conflict' ? 'When technical and fundamental analyses disagree, it creates conflicting forces that reduce the probability of a clean move to your target.' : 'With one factor being stronger than the other, you have moderate probability but need to monitor for changes.'}`;
+  }
+  
+  if (msgLower.includes('risk') && msgLower.includes('reward')) {
+    const resistance = technical.keyLevels.find(l => l.type === 'Resistance');
+    const support = technical.keyLevels.find(l => l.type === 'Support');
+    return `Based on the key levels identified, your resistance is at ${resistance.value} and support at ${support.value}. ${technical.outlook.includes('BULLISH') ? `For a long position, you could enter near ${support.value} with a stop loss just below it, targeting ${resistance.value}. This would give you roughly a 2:1 risk-reward ratio.` : technical.outlook.includes('BEARISH') ? `For a short position, you could enter near ${resistance.value} with a stop loss just above it, targeting ${support.value}.` : 'With neutral conditions, wait for a clear breakout above resistance or below support before establishing your risk-reward parameters.'}`;
+  }
+  
+  if (msgLower.includes('when') && (msgLower.includes('enter') || msgLower.includes('entry'))) {
+    if (alignment.status === 'aligned') {
+      return `With ${alignment.probabilityPercent}% probability and strong alignment, you can consider entering on a confirmed ${technical.trend} signal. ${technical.outlook.includes('BULLISH') ? `Look for a bounce off support with bullish confirmation candles, or a break and retest of a key resistance level.` : `Look for a rejection at resistance with bearish confirmation, or a break and retest of a key support level.`} Your confluence of technical and fundamental factors gives you confidence to act on the setup.`;
+    } else if (alignment.status === 'conflict') {
+      return `Given the conflicting signals (${alignment.probabilityPercent}% probability), I'd recommend waiting for more confirmation. Either wait for the fundamental sentiment to shift in favor of your technical outlook, or wait for a stronger technical signal that could override the fundamental headwinds. Consider reducing position size if you do enter.`;
+    } else {
+      return `With ${alignment.probabilityPercent}% probability and partial alignment, you can enter with normal position sizing but stay alert. ${technical.outlook.includes('BULLISH') ? `Consider entering on a pullback to support rather than chasing.` : technical.outlook.includes('BEARISH') ? `Consider entering on a rally to resistance rather than chasing.` : `Wait for a clear directional break before committing.`} Keep your stop loss tight and monitor for any fundamental shifts.`;
+    }
+  }
+  
+  if (msgLower.includes('support') || msgLower.includes('resistance')) {
+    const resistance = technical.keyLevels.find(l => l.type === 'Resistance');
+    const support = technical.keyLevels.find(l => l.type === 'Support');
+    
+    if (msgLower.includes('break')) {
+      if (msgLower.includes('support')) {
+        return `If price breaks below support at ${support.value}, it would invalidate the current ${technical.outlook} setup. ${fundamental.outlook.includes('BEARISH') ? 'This would actually align with the bearish fundamental bias, potentially leading to further downside.' : 'However, this would conflict with the fundamental picture, so watch for a potential false breakdown and quick recovery.'} Consider your stop loss placement carefully - below ${support.value} would be safest.`;
+      } else {
+        return `If price breaks above resistance at ${resistance.value}, it would confirm bullish momentum. ${fundamental.outlook.includes('BULLISH') ? 'This would be particularly strong given the supportive fundamental backdrop, potentially leading to an extended move.' : 'However, fundamentals might limit the upside, so consider taking partial profits at the breakout and trailing your stop.'} A retest of ${resistance.value} after the break would offer a good entry for those who missed it.`;
+      }
+    }
+    
+    return `Key levels on ${pair}: Resistance is at ${resistance.value} (${resistance.strength} level) and support at ${support.value} (${support.strength} level). ${technical.outlook.includes('BULLISH') ? `Watch for bounces off support as buying opportunities.` : technical.outlook.includes('BEARISH') ? `Watch for rejections at resistance as selling opportunities.` : `These levels will define the range - trade the bounces until a breakout occurs.`} Your pivot level is ${technical.keyLevels.find(l => l.type === 'Pivot').value}.`;
+  }
+  
+  if (msgLower.includes('pattern')) {
+    const mainPattern = technical.patterns[0];
+    return `I detected a ${mainPattern.name} pattern with ${Math.round(mainPattern.confidence * 100)}% confidence. This is a ${mainPattern.sentiment} pattern. ${mainPattern.sentiment === 'bullish' ? 'Bullish patterns typically suggest upward momentum, and with your fundamental alignment, this strengthens the case for longs.' : mainPattern.sentiment === 'bearish' ? 'Bearish patterns indicate downward pressure, which you should factor into your trade direction.' : 'Neutral patterns suggest consolidation - wait for a directional break before committing.'} Additionally, I found ${technical.patterns.length} patterns total on your chart.`;
+  }
+  
+  if (msgLower.includes('fundamental') || msgLower.includes('news')) {
+    return `The fundamental analysis for ${pair} shows ${fundamental.outlook} with a score of ${fundamental.score > 0 ? '+' : ''}${fundamental.score}. ${fundamental.summary.substring(0, 200)}... The key is that ${alignment.status === 'aligned' ? 'fundamentals are supporting your technical outlook, which increases the probability of follow-through.' : alignment.status === 'conflict' ? 'fundamentals are working against your technical setup, which is why probability is lower.' : 'fundamentals are neutral or mixed relative to technicals, creating moderate probability.'}`;
+  }
+  
+  if (msgLower.includes('timeframe') || msgLower.includes('time frame')) {
+    return `The analysis was performed on the ${technical.timeframe} timeframe. ${technical.timeframe === 'H4' ? 'The 4-hour chart is great for swing trades - positions typically last several days. Consider checking the H1 for entry timing and the Daily for trend confirmation.' : ''} Remember that probability and levels should be validated across multiple timeframes for highest confidence.`;
+  }
+  
+  if (msgLower.includes('stop loss') || msgLower.includes('stoploss') || msgLower.includes('sl')) {
+    const support = technical.keyLevels.find(l => l.type === 'Support');
+    const resistance = technical.keyLevels.find(l => l.type === 'Resistance');
+    return `For stop loss placement on ${pair}: ${technical.outlook.includes('BULLISH') ? `Place your stop below ${support.value} to protect against a breakdown. Add a small buffer (maybe 10-20 pips) to avoid getting stopped by a quick wick.` : technical.outlook.includes('BEARISH') ? `Place your stop above ${resistance.value} to protect against a breakout. Add a buffer to avoid premature stop-outs.` : `In neutral conditions, use tight stops since direction is unclear. Place stops just outside the range at ${support.value} or ${resistance.value}.`} With ${alignment.probabilityPercent}% probability, ${alignment.status === 'aligned' ? 'you can be more confident in your stop placement' : 'consider using a tighter stop or smaller position size'}.`;
+  }
+  
+  if (msgLower.includes('position size') || msgLower.includes('how much')) {
+    return `Position sizing should reflect the ${alignment.probabilityPercent}% probability. ${alignment.status === 'aligned' ? 'With strong alignment, you could use your standard position size or even slightly increase it if you have high conviction.' : alignment.status === 'conflict' ? 'With conflicting signals, reduce your position size to 25-50% of normal to account for the lower probability and higher uncertainty.' : 'With moderate probability, use standard position sizing but stay alert to changes in either technical or fundamental conditions.'} Always follow your risk management rules - never risk more than 1-2% of your account per trade.`;
+  }
+  
+  if (msgLower.includes('take profit') || msgLower.includes('target') || msgLower.includes('tp')) {
+    const resistance = technical.keyLevels.find(l => l.type === 'Resistance');
+    const support = technical.keyLevels.find(l => l.type === 'Support');
+    return `Take profit targets for ${pair}: ${technical.outlook.includes('BULLISH') ? `Primary target is at ${resistance.value}. Consider taking partial profits there and letting the rest run with a trailing stop if momentum continues.` : technical.outlook.includes('BEARISH') ? `Primary target is at ${support.value}. Take partials at this level and trail the remainder if selling pressure persists.` : `With neutral momentum, target the range extremes - ${resistance.value} on the upside, ${support.value} on the downside.`} Remember, your probability of reaching TP is ${alignment.probabilityPercent}%, so ${alignment.probabilityPercent > 65 ? 'you have good odds' : 'manage expectations and consider scaling out'}.`;
+  }
+  
+  // Default response if no specific pattern matched
+  return `Based on your ${pair} analysis: You have a ${alignment.status} setup with ${alignment.probabilityPercent}% probability of reaching take profit. Technical outlook is ${technical.outlook} (${technical.score > 0 ? '+' : ''}${technical.score}), and fundamental bias is ${fundamental.outlook} (${fundamental.score > 0 ? '+' : ''}${fundamental.score}). ${alignment.verdict.substring(0, 150)}... Feel free to ask more specific questions about entries, stop losses, risk-reward, or any aspect of the analysis!`;
+}
+
 app.listen(PORT, () => {
   console.log(`🚀 Forex Fundamental Analyzer running on http://localhost:${PORT}`);
   console.log(`📊 API ready to analyze ${CURRENCIES.length} currencies and ${FOREX_PAIRS.length} forex pairs`);

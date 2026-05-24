@@ -275,6 +275,15 @@ function displayChartResults(data) {
     // Trade Recommendation
     document.getElementById('recommendation-text').innerHTML = `<p>${data.technical.recommendation}</p>`;
     
+    // Store analysis context for chat
+    currentAnalysisContext = {
+        pair: data.pair,
+        technical: data.technical,
+        fundamental: data.fundamental,
+        alignment: data.alignment,
+        timestamp: data.timestamp
+    };
+    
     chartResults.classList.remove('hidden');
     chartResults.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -463,3 +472,107 @@ function hideLoading() {
 
 // Start the app
 init();
+
+
+
+// Chat functionality
+let currentAnalysisContext = null;
+
+function setupChatInterface() {
+    const chatInput = document.getElementById('chat-input');
+    const sendBtn = document.getElementById('send-chat-btn');
+    
+    sendBtn.addEventListener('click', sendChatMessage);
+    
+    chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            sendChatMessage();
+        }
+    });
+}
+
+async function sendChatMessage() {
+    const chatInput = document.getElementById('chat-input');
+    const message = chatInput.value.trim();
+    
+    if (!message || !currentAnalysisContext) return;
+    
+    // Add user message to chat
+    addChatMessage(message, 'user');
+    chatInput.value = '';
+    
+    // Show typing indicator
+    showTypingIndicator();
+    
+    try {
+        const response = await fetch(`${API_BASE}/api/chat`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                message: message,
+                context: currentAnalysisContext
+            })
+        });
+        
+        const data = await response.json();
+        
+        // Remove typing indicator
+        removeTypingIndicator();
+        
+        if (response.ok) {
+            addChatMessage(data.response, 'ai');
+        } else {
+            addChatMessage('Sorry, I encountered an error. Please try again.', 'ai');
+        }
+    } catch (error) {
+        console.error('Chat error:', error);
+        removeTypingIndicator();
+        addChatMessage('Sorry, I couldn\'t process your message. Please try again.', 'ai');
+    }
+}
+
+function addChatMessage(text, sender) {
+    const messagesContainer = document.getElementById('chat-messages');
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `chat-message ${sender}-message`;
+    
+    const avatar = sender === 'ai' ? '🤖' : '👤';
+    
+    messageDiv.innerHTML = `
+        <div class="message-avatar">${avatar}</div>
+        <div class="message-content">
+            <p>${text}</p>
+        </div>
+    `;
+    
+    messagesContainer.appendChild(messageDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function showTypingIndicator() {
+    const messagesContainer = document.getElementById('chat-messages');
+    const typingDiv = document.createElement('div');
+    typingDiv.className = 'chat-message ai-message typing-indicator-message';
+    typingDiv.innerHTML = `
+        <div class="message-avatar">🤖</div>
+        <div class="message-content typing-indicator">
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+            <div class="typing-dot"></div>
+        </div>
+    `;
+    messagesContainer.appendChild(typingDiv);
+    messagesContainer.scrollTop = messagesContainer.scrollHeight;
+}
+
+function removeTypingIndicator() {
+    const typingIndicator = document.querySelector('.typing-indicator-message');
+    if (typingIndicator) {
+        typingIndicator.remove();
+    }
+}
+
+// Initialize chat when app starts
+setupChatInterface();

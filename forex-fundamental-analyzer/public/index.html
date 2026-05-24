@@ -219,6 +219,32 @@
                             <div id="recommendation-text"></div>
                         </div>
                     </div>
+                    
+                    <!-- AI Chat Interface -->
+                    <div class="ai-chat-section">
+                        <h3>💬 Ask AI About Your Analysis</h3>
+                        <p class="chat-subtitle">Have questions about the analysis? Ask the AI for clarification or more details.</p>
+                        
+                        <div id="chat-messages" class="chat-messages">
+                            <div class="chat-message ai-message">
+                                <div class="message-avatar">🤖</div>
+                                <div class="message-content">
+                                    <p>Hi! I've analyzed your chart. Feel free to ask me anything about the technical analysis, fundamental bias, or trade recommendation. For example:</p>
+                                    <ul class="suggestion-list">
+                                        <li>"Why is the probability X%?"</li>
+                                        <li>"What if the price breaks the support?"</li>
+                                        <li>"Should I enter now or wait?"</li>
+                                        <li>"What's my risk-reward ratio?"</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="chat-input-container">
+                            <input type="text" id="chat-input" placeholder="Ask about your chart analysis..." />
+                            <button id="send-chat-btn" class="send-btn">Send</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>

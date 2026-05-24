@@ -493,23 +493,44 @@ function checkAlignment(techOutlook, fundOutlook, techScore, fundScore) {
   let alignmentIcon = '⚠️';
   let alignmentText = 'Partial Alignment';
   let verdict = '';
+  let probabilityPercent = 50; // Base probability
+  
+  // Calculate probability of reaching take profit based on alignment
+  const absAvgScore = Math.abs((Math.abs(techScore) + Math.abs(fundScore)) / 2);
   
   if (techDirection === fundDirection && techDirection !== 'neutral') {
+    // Both agree - high probability
     alignmentStatus = 'aligned';
     alignmentIcon = '✅';
     alignmentText = 'Strong Alignment';
-    verdict = `Excellent! Your chart analysis aligns with fundamental bias. Both technical and fundamental factors support a ${techDirection} outlook on this pair. This confluence increases trade probability and confidence. Consider this a high-conviction setup.`;
+    
+    // Base probability: 70-85% when aligned
+    probabilityPercent = Math.min(85, 70 + Math.round(absAvgScore * 0.15));
+    
+    verdict = `Excellent! Your chart analysis aligns with fundamental bias. Both technical and fundamental factors support a ${techDirection} outlook on this pair. This confluence significantly increases the probability of reaching your take profit target. Consider this a high-conviction setup with strong directional agreement.`;
+    
   } else if ((techDirection === 'bullish' && fundDirection === 'bearish') || 
              (techDirection === 'bearish' && fundDirection === 'bullish')) {
+    // Direct conflict - low probability
     alignmentStatus = 'conflict';
     alignmentIcon = '❌';
     alignmentText = 'Conflicting Signals';
-    verdict = `Caution advised! Technical analysis suggests ${techDirection} bias while fundamentals indicate ${fundDirection} sentiment. This divergence increases risk. Consider waiting for confirmation or reducing position size. One perspective may be lagging the other.`;
+    
+    // Base probability: 25-40% when conflicting
+    probabilityPercent = Math.max(25, 40 - Math.round(absAvgScore * 0.15));
+    
+    verdict = `Caution advised! Technical analysis suggests ${techDirection} bias while fundamentals indicate ${fundDirection} sentiment. This divergence significantly reduces the probability of reaching your take profit. Consider waiting for confirmation or reducing position size substantially. One perspective may be lagging the other - the conflicting signals increase the risk of reversal before hitting TP.`;
+    
   } else {
+    // One neutral or mixed signals
     alignmentStatus = 'partial';
     alignmentIcon = '⚠️';
     alignmentText = 'Mixed Signals';
-    verdict = `Moderate alignment detected. Technical outlook is ${techOutlook} while fundamental bias is ${fundOutlook}. Not a perfect match but not opposing either. Proceed with normal risk management. Monitor for shifts in either technical or fundamental landscape.`;
+    
+    // Base probability: 45-60% when mixed
+    probabilityPercent = Math.min(60, 45 + Math.round(absAvgScore * 0.15));
+    
+    verdict = `Moderate alignment detected. Technical outlook is ${techOutlook} while fundamental bias is ${fundOutlook}. Not a perfect match but not opposing either. The probability of reaching take profit is moderate - one factor is supportive while the other is neutral or unclear. Proceed with standard risk management and monitor for shifts in either technical or fundamental landscape that could improve or worsen the setup.`;
   }
   
   return {
@@ -519,6 +540,7 @@ function checkAlignment(techOutlook, fundOutlook, techScore, fundScore) {
     verdict: verdict,
     technicalDirection: techDirection,
     fundamentalDirection: fundDirection,
+    probabilityPercent: probabilityPercent,
     confidence: alignmentStatus === 'aligned' ? 'High' : alignmentStatus === 'conflict' ? 'Low' : 'Medium'
   };
 }

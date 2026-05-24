@@ -247,8 +247,11 @@ function displayChartResults(data) {
     alignmentDiv.innerHTML = `
         <div class="alignment-icon">${data.alignment.icon}</div>
         <div class="alignment-text">${data.alignment.text}</div>
-        <div style="margin-top: 10px; font-size: 0.9rem; font-weight: 600;">
-            Confidence: ${data.alignment.confidence}
+        <div style="margin-top: 10px; font-size: 1.2rem; font-weight: 700; color: #1f2937;">
+            ${data.alignment.probabilityPercent}% Probability
+        </div>
+        <div style="margin-top: 5px; font-size: 0.85rem; color: #6b7280;">
+            Chance of reaching take profit
         </div>
     `;
     

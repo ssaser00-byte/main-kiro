@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Forex Fundamental Analyzer - AI-Powered Sentiment Dashboard</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🌐 Forex Fundamental Analyzer</h1>
+            <p class="subtitle">AI-Powered News Sentiment & Fundamental Analysis</p>
+        </header>
+
+        <div class="controls">
+            <div class="tab-buttons">
+                <button class="tab-btn active" data-tab="currency">Single Currency</button>
+                <button class="tab-btn" data-tab="pair">Currency Pair</button>
+            </div>
+        </div>
+
+        <!-- Currency Analysis Tab -->
+        <div class="tab-content active" id="currency-tab">
+            <div class="search-section">
+                <label for="currency-select">Select Currency:</label>
+                <select id="currency-select">
+                    <option value="">Choose a currency...</option>
+                </select>
+                <button id="analyze-currency-btn" class="analyze-btn">Analyze Currency</button>
+            </div>
+            
+            <div id="currency-results" class="results hidden">
+                <div class="result-card">
+                    <h2 id="currency-name"></h2>
+
+                    
+                    <div class="sentiment-overview">
+                        <div class="sentiment-score">
+                            <span class="score-label">Sentiment Score</span>
+                            <span id="currency-score" class="score-value"></span>
+                        </div>
+                        <div class="outlook-badge" id="currency-outlook"></div>
+                    </div>
+
+                    <div class="ai-summary">
+                        <h3>📊 AI Analysis Summary</h3>
+                        <p id="currency-summary"></p>
+                    </div>
+
+                    <div class="breakdown">
+                        <h3>News Breakdown</h3>
+                        <div class="breakdown-bars">
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Bullish</span>
+                                <div class="breakdown-bar">
+                                    <div id="currency-bullish-bar" class="bar bullish"></div>
+                                </div>
+                                <span id="currency-bullish-count" class="breakdown-count"></span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Bearish</span>
+                                <div class="breakdown-bar">
+
+                                    <div id="currency-bearish-bar" class="bar bearish"></div>
+                                </div>
+                                <span id="currency-bearish-count" class="breakdown-count"></span>
+                            </div>
+                            <div class="breakdown-item">
+                                <span class="breakdown-label">Neutral</span>
+                                <div class="breakdown-bar">
+                                    <div id="currency-neutral-bar" class="bar neutral"></div>
+                                </div>
+                                <span id="currency-neutral-count" class="breakdown-count"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="key-factors">
+                        <h3>🔑 Key Fundamental Factors</h3>
+                        <div id="currency-factors"></div>
+                    </div>
+
+                    <div class="news-list">
+                        <h3>📰 Latest News</h3>
+                        <div id="currency-news"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pair Analysis Tab -->
+        <div class="tab-content" id="pair-tab">
+            <div class="search-section">
+                <label for="pair-select">Select Forex Pair:</label>
+                <select id="pair-select">
+
+                    <option value="">Choose a pair...</option>
+                </select>
+                <button id="analyze-pair-btn" class="analyze-btn">Analyze Pair</button>
+            </div>
+            
+            <div id="pair-results" class="results hidden">
+                <div class="result-card">
+                    <h2 id="pair-name"></h2>
+                    
+                    <div class="sentiment-overview">
+                        <div class="sentiment-score">
+                            <span class="score-label">Relative Strength Score</span>
+                            <span id="pair-score" class="score-value"></span>
+                        </div>
+                        <div class="outlook-badge" id="pair-outlook"></div>
+                    </div>
+
+                    <div class="ai-summary">
+                        <h3>📊 AI Trading Recommendation</h3>
+                        <p id="pair-recommendation"></p>
+                    </div>
+
+                    <div class="currency-comparison">
+                        <div class="comparison-item">
+                            <h3 id="base-currency-title"></h3>
+                            <div class="mini-outlook" id="base-outlook"></div>
+                            <div class="mini-score">Score: <span id="base-score"></span></div>
+                            <p id="base-summary" class="mini-summary"></p>
+                        </div>
+                        
+                        <div class="vs-divider">VS</div>
+                        
+                        <div class="comparison-item">
+
+                            <h3 id="quote-currency-title"></h3>
+                            <div class="mini-outlook" id="quote-outlook"></div>
+                            <div class="mini-score">Score: <span id="quote-score"></span></div>
+                            <p id="quote-summary" class="mini-summary"></p>
+                        </div>
+                    </div>
+
+                    <div class="news-columns">
+                        <div class="news-column">
+                            <h3 id="base-news-title">📰 Base Currency News</h3>
+                            <div id="base-news"></div>
+                        </div>
+                        <div class="news-column">
+                            <h3 id="quote-news-title">📰 Quote Currency News</h3>
+                            <div id="quote-news"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="loading" class="loading hidden">
+            <div class="spinner"></div>
+            <p>Analyzing market data...</p>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

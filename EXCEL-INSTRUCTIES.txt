@@ -1,0 +1,248 @@
+═══════════════════════════════════════════════════════════════
+TRADING JOURNAL - COMPLETE EXCEL SETUP INSTRUCTIES
+═══════════════════════════════════════════════════════════════
+
+📁 BESTANDEN DIE JE HEBT:
+1. trading-journal-main.csv - Je hoofdjournal voor alle trades
+2. trading-journal-maandelijks-overzicht.csv - Maandelijkse statistieken
+3. trading-journal-per-pair.csv - Analyse per valutapaar
+4. trading-journal-long-vs-short.csv - Long vs Short analyse
+
+═══════════════════════════════════════════════════════════════
+STAP 1: EXCEL WORKBOOK AANMAKEN
+═══════════════════════════════════════════════════════════════
+
+1. Open Excel
+2. Maak een nieuwe workbook aan
+3. Hernoem de sheets:
+   - Sheet1 → "Trades"
+   - Sheet2 → "Maandoverzicht"  
+   - Sheet3 → "Per Pair"
+   - Sheet4 → "Long vs Short"
+   - Sheet5 → "Dashboard"
+
+═══════════════════════════════════════════════════════════════
+STAP 2: IMPORTEER DE CSV BESTANDEN
+═══════════════════════════════════════════════════════════════
+
+Voor elke sheet:
+1. Ga naar Data → From Text/CSV
+2. Selecteer het juiste CSV bestand
+3. Klik op "Load"
+
+Sheet "Trades" → trading-journal-main.csv
+Sheet "Maandoverzicht" → trading-journal-maandelijks-overzicht.csv
+Sheet "Per Pair" → trading-journal-per-pair.csv
+Sheet "Long vs Short" → trading-journal-long-vs-short.csv
+
+═══════════════════════════════════════════════════════════════
+STAP 3: FORMULES VOOR "TRADES" SHEET
+═══════════════════════════════════════════════════════════════
+
+AUTOMATISCHE BEREKENINGEN (zet deze in aparte kolommen rechts):
+
+Kolom H - Trade Nummer:
+=ROW()-1
+
+Kolom I - Cumulatief %:
+=SUM($F$2:F2)
+
+═══════════════════════════════════════════════════════════════
+STAP 4: FORMULES VOOR "MAANDOVERZICHT" SHEET
+═══════════════════════════════════════════════════════════════
+
+Als je zelf wilt berekenen (in plaats van het CSV bestand):
+
+Kolom B - Totaal Trades (bijv. voor Januari in cel B2):
+=COUNTIF(Trades!B:B,A2)
+
+Kolom C - Winnende Trades:
+=COUNTIFS(Trades!B:B,A2,Trades!E:E,"Win")
+
+Kolom D - Verliezende Trades:
+=COUNTIFS(Trades!B:B,A2,Trades!E:E,"Loss")
+
+Kolom E - Winrate %:
+=IF(B2=0,0,C2/B2)
+(Formaat als percentage: selecteer cel → Ctrl+Shift+5)
+
+Kolom F - Totaal %:
+=SUMIF(Trades!B:B,A2,Trades!F:F)
+
+Kolom G - Gemiddelde Win %:
+=AVERAGEIFS(Trades!F:F,Trades!B:B,A2,Trades!E:E,"Win")
+
+Kolom H - Gemiddelde Loss %:
+=AVERAGEIFS(Trades!F:F,Trades!B:B,A2,Trades!E:E,"Loss")
+
+═══════════════════════════════════════════════════════════════
+STAP 5: DASHBOARD SHEET MAKEN
+═══════════════════════════════════════════════════════════════
+
+Maak een mooi dashboard met deze elementen:
+
+📊 KEY METRICS (grote getallen bovenaan):
+────────────────────────────────────────────
+
+Cel B2: "Totaal Trades"
+Cel B3: =COUNTA(Trades!A:A)-1
+
+Cel D2: "Winrate"
+Cel D3: =COUNTIF(Trades!E:E,"Win")/(COUNTA(Trades!E:E)-1)
+(Formaat als percentage)
+
+Cel F2: "Totaal Rendement"
+Cel F3: =SUM(Trades!F:F)
+(Formaat als percentage met 2 decimalen)
+
+Cel H2: "Gemiddelde Trade"
+Cel H3: =AVERAGE(Trades!F:F)
+
+Cel J2: "Beste Trade"
+Cel J3: =MAX(Trades!F:F)
+
+Cel L2: "Slechtste Trade"
+Cel L3: =MIN(Trades!F:F)
+
+📈 GRAFIEKEN:
+────────────────────────────────────────────
+
+1. EQUITY CURVE (Groeilijn):
+   - Selecteer Trades kolom A (Datum) en kolom I (Cumulatief %)
+   - Insert → Line Chart
+   - Titel: "Account Growth"
+
+2. WINRATE PER MAAND:
+   - Selecteer Maandoverzicht kolom A (Maand) en kolom E (Winrate %)
+   - Insert → Column Chart
+   - Titel: "Maandelijkse Winrate"
+
+3. RENDEMENT PER MAAND:
+   - Selecteer Maandoverzicht kolom A (Maand) en kolom F (Totaal %)
+   - Insert → Column Chart
+   - Titel: "Maandelijks Rendement"
+
+4. WIN/LOSS VERDELING:
+   - Maak een Pie Chart met aantal Wins vs Losses
+   - Data: Tel alle Wins en Losses uit Trades sheet
+
+5. BEST PERFORMING PAIRS:
+   - Selecteer "Per Pair" kolom A (Pair) en kolom F (Totaal %)
+   - Insert → Bar Chart (horizontaal)
+   - Sorteer van hoog naar laag
+
+═══════════════════════════════════════════════════════════════
+STAP 6: OPMAAK EN STYLING
+═══════════════════════════════════════════════════════════════
+
+VOORWAARDELIJKE OPMAAK voor "Trades" sheet:
+
+1. Selecteer kolom E (Win/Loss):
+   - Home → Conditional Formatting → Highlight Cell Rules → Equal To
+   - "Win" = Groene opvulling
+   - "Loss" = Rode opvulling
+
+2. Selecteer kolom F (Percentage):
+   - Home → Conditional Formatting → Color Scales
+   - Kies groen (positief) naar rood (negatief)
+
+3. Selecteer kolom D (Long/Short):
+   - "Long" = Blauwe opvulling
+   - "Short" = Oranje opvulling
+
+TABEL OPMAAK:
+1. Selecteer je data range in "Trades"
+2. Ctrl + T (maak er een Table van)
+3. Vink "My table has headers" aan
+4. Kies een mooi table style
+
+═══════════════════════════════════════════════════════════════
+STAP 7: FILTERS EN SLICERS
+═══════════════════════════════════════════════════════════════
+
+1. In "Trades" sheet:
+   - Klik ergens in de tabel
+   - Data → Filter (of Ctrl+Shift+L)
+
+2. SLICERS toevoegen (voor makkelijk filteren):
+   - Klik in de tabel
+   - Table Design → Insert Slicer
+   - Selecteer: Maand, Pair, Long/Short, Win/Loss
+   - Positioneer de slicers rechts van je data
+
+═══════════════════════════════════════════════════════════════
+STAP 8: NIEUWE TRADE TOEVOEGEN
+═══════════════════════════════════════════════════════════════
+
+Om een nieuwe trade toe te voegen:
+
+1. Ga naar "Trades" sheet
+2. Voeg een nieuwe rij toe onderaan de tabel
+3. Vul in:
+   - Datum (DD-MM-YYYY)
+   - Maand (bijv. "Januari")
+   - Pair (bijv. "EURUSD")
+   - Long/Short
+   - Win/Loss
+   - Percentage (gebruik % teken, bijv. 2.5%)
+   - Notes (optioneel)
+
+4. Alle andere sheets updaten AUTOMATISCH!
+
+═══════════════════════════════════════════════════════════════
+STAP 9: EXTRA FEATURES (OPTIONEEL)
+═══════════════════════════════════════════════════════════════
+
+📅 DROPDOWN LISTS (voor consistente data):
+
+1. Voor kolom B (Maand):
+   - Selecteer alle cellen in kolom B (vanaf B2)
+   - Data → Data Validation
+   - Allow: List
+   - Source: Januari,Februari,Maart,April,Mei,Juni,Juli,Augustus,September,Oktober,November,December
+
+2. Voor kolom D (Long/Short):
+   - Source: Long,Short
+
+3. Voor kolom E (Win/Loss):
+   - Source: Win,Loss
+
+📊 PIVOT TABLE voor diepere analyse:
+1. Selecteer je "Trades" tabel
+2. Insert → PivotTable
+3. Nieuwe sheet aanmaken
+4. Sleep velden naar:
+   - Rows: Maand of Pair
+   - Values: Sum of Percentage, Count of Win/Loss
+
+═══════════════════════════════════════════════════════════════
+STAP 10: TEMPLATE OPSLAAN
+═══════════════════════════════════════════════════════════════
+
+1. Save As → Excel Workbook (.xlsx)
+2. Naam: "Trading Journal 2024.xlsx"
+3. Locatie: Kies je gewenste map
+
+Voor backup:
+- Save As → Excel Template (.xltx)
+- Zo kun je elk jaar een nieuwe starten met dezelfde opmaak
+
+═══════════════════════════════════════════════════════════════
+TIPS & TRICKS
+═══════════════════════════════════════════════════════════════
+
+✅ Vul DIRECT na elke trade je journal in (discipline!)
+✅ Review je statistieken wekelijks
+✅ Let op welke pairs het beste voor je werken
+✅ Analyseer je slechtste trades voor verbeterpunten
+✅ Maak screenshots van je charts en verwijs ernaar in Notes
+✅ Backup je Excel bestand regelmatig (bijv. naar cloud)
+
+📱 MOBIEL:
+- Gebruik Google Sheets als je vanaf je telefoon wilt invullen
+- Upload je Excel naar Google Drive
+- Open in Google Sheets (converteer naar Sheets format)
+
+═══════════════════════════════════════════════════════════════
+VEEL SUCCES MET JE TRADING! 🚀📈
+═══════════════════════════════════════════════════════════════

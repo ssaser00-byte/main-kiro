@@ -1,0 +1,192 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  TRADER
+  STUDENT
+  COACH
+  ADMIN
+}
+
+enum PlanStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum ViolationSeverity {
+  MINOR
+  MAJOR
+  CRITICAL
+}
+
+enum AccountabilityEventType {
+  WARNING
+  REFLECTION_REQUIRED
+  TRADING_PAUSE_SUGGESTED
+  HARD_STOP
+}
+
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  password      String
+  role          UserRole  @default(TRADER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  // Relations
+  tradingPlans  TradingPlan[]
+  trades        Trade[]
+  accountabilityEvents AccountabilityEvent[]
+  
+  // Coach relationships
+  coaching      CoachRelationship[] @relation("Coach")
+  coachedBy     CoachRelationship[] @relation("Student")
+  
+  // Settings
+  settings      Json?
+  
+  @@map("users")
+}
+
+model TradingPlan {
+  id            String      @id @default(cuid())
+  userId        String
+  version       Int         @default(1)
+  status        PlanStatus  @default(DRAFT)
+  
+  // Plan sections (stored as JSON for flexibility)
+  biasPlan      Json        // { rules: [], timeframes: [], description: "" }
+  poiPlan       Json        // { rules: [], validZones: [], invalidZones: [] }
+  entryPlan     Json        // { confirmations: [], models: [], maxTradesPerDay: 2 }
+  exitPlan      Json        // { stopLoss: "", takeProfit: "", partials: [] }
+  
+  createdAt     DateTime    @default(now())
+  activatedAt   DateTime?
+  
+  // Relations
+  user          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades        Trade[]
+  
+  @@map("trading_plans")
+}
+
+model Trade {
+  id              String    @id @default(cuid())
+  userId          String
+  tradingPlanId   String?
+  
+  // Trade details
+  symbol          String
+  entryPrice      Float
+  exitPrice       Float?
+  stopLoss        Float?
+  takeProfit      Float?
+  lotSize         Float
+  riskPercent     Float?
+  riskAmount      Float?
+  
+  // Timestamps
+  entryTime       DateTime
+  exitTime        DateTime?
+  durationMinutes Int?
+  
+  // Session and context
+  session         String?    // London, New York, Asian
+  setupType       String?    // A+, B, C
+  entryModel      String?
+  dayOfWeek       String?
+  
+  // Results
+  resultAmount    Float?
+  resultPercent   Float?
+  resultR         Float?
+  isWin           Boolean?
+  
+  // Screenshots and notes
+  screenshotUrl   String?
+  traderNotes     String?
+  emotionalTags   String[]   @default([])
+  
+  // Plan compliance
+  planFollowed    Boolean?
+  violationsJson  Json?      // Array of violation objects
+  
+  // Broker integration
+  brokerTradeId   String?
+  
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  
+  // Relations
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tradingPlan     TradingPlan? @relation(fields: [tradingPlanId], references: [id])
+  violations      RuleViolation[]
+  
+  @@map("trades")
+}
+
+model RuleViolation {
+  id              String              @id @default(cuid())
+  tradeId         String
+  
+  ruleCategory    String              // bias, poi, entry, exit
+  ruleDescription String
+  severity        ViolationSeverity   @default(MINOR)
+  impactAnalysis  String?
+  
+  createdAt       DateTime            @default(now())
+  
+  // Relations
+  trade           Trade               @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  
+  @@map("rule_violations")
+}
+
+model AccountabilityEvent {
+  id              String                    @id @default(cuid())
+  userId          String
+  
+  eventType       AccountabilityEventType
+  severity        ViolationSeverity
+  description     String
+  
+  triggeredAt     DateTime                  @default(now())
+  resolved        Boolean                   @default(false)
+  resolvedAt      DateTime?
+  resolutionNotes String?
+  
+  // Relations
+  user            User                      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("accountability_events")
+}
+
+model CoachRelationship {
+  id              String    @id @default(cuid())
+  coachId         String
+  studentId       String
+  
+  status          String    @default("active") // active, paused, ended
+  
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  coach           User      @relation("Coach", fields: [coachId], references: [id], onDelete: Cascade)
+  student         User      @relation("Student", fields: [studentId], references: [id], onDelete: Cascade)
+  
+  @@unique([coachId, studentId])
+  @@map("coach_relationships")
+}
